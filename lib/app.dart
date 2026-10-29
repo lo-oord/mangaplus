@@ -1,0 +1,77 @@
+import 'package:flutter/material.dart';
+
+const navy = Color(0xFF121923), surface = Color(0xFF1B2532), surface2 = Color(0xFF263344), accent = Color(0xFF4D9BFF), muted = Color(0xFF9BA8B8);
+
+class MangaItem {
+  final String title, subtitle, asset, description, status; final int chapters; final List<String> tags; bool favorite;
+  MangaItem(this.title,this.subtitle,this.asset,this.description,this.status,this.chapters,this.tags,{this.favorite=false});
+}
+final manga = <MangaItem>[
+  MangaItem('ظل التنين','Dragon Shade','assets/covers/dragon.png','في مدينة معلقة فوق الغيوم، يكتشف شاب هادئ قوة قديمة تغيّر مصير المملكة.','مستمر',48,['أكشن','فانتازيا'],favorite:true),
+  MangaItem('زهرة القمر','Moon Bloom','assets/covers/moon.png','رحلة رومانسية بين ساحرة صغيرة وحارس يحمل سرًا من أسرار القمر.','مستمر',32,['رومانسي','دراما']),
+  MangaItem('آخر صياد','The Last Hunter','assets/covers/hunter.png','بعد انهيار المدن، يبقى صياد واحد يبحث عن الناجين وسط عالم مليء بالوحوش.','مكتمل',76,['مغامرة','أكشن']),
+  MangaItem('أكاديمية النجوم','Star Academy','assets/covers/star.png','طلاب موهوبون يتنافسون لصناعة مستقبل جديد بين النجوم.','مستمر',25,['مدرسي','خيال']),
+  MangaItem('متاهة الزجاج','Glass Maze','assets/covers/glass.png','كل باب في المتاهة يكشف ذكرى، وكل ذكرى تقرّب البطلة من الحقيقة.','مستمر',19,['غموض','دراما']),
+  MangaItem('مقهى منتصف الليل','Midnight Cafe','assets/covers/cafe.png','مقهى لا يفتح إلا بعد منتصف الليل، ويستقبل زوارًا من عوالم مختلفة.','مكتمل',41,['شريحة من الحياة','فانتازيا']),
+];
+enum Page { latest,manga,favorites,storage,notifications,settings,about }
+
+class MangaPlusApp extends StatelessWidget { const MangaPlusApp({super.key}); @override Widget build(BuildContext c)=>MaterialApp(debugShowCheckedModeBanner:false,title:'Manga Plus',theme:ThemeData(useMaterial3:true,brightness:Brightness.dark,scaffoldBackgroundColor:navy,colorScheme:ColorScheme.fromSeed(seedColor:accent,brightness:Brightness.dark)),home:const Splash()); }
+class Splash extends StatefulWidget { const Splash({super.key}); @override State<Splash> createState()=>_SplashState(); }
+class _SplashState extends State<Splash>{ @override void initState(){super.initState();Future.delayed(const Duration(milliseconds:900),(){if(mounted)Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>const Shell()));});} @override Widget build(BuildContext c)=>Scaffold(backgroundColor:navy,body:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[_logo(94),const SizedBox(height:18),const Text('MANGA PLUS',style:TextStyle(letterSpacing:3,fontSize:18,fontWeight:FontWeight.w700))]))); }
+Widget _logo(double size)=>Container(width:size,height:size,decoration:BoxDecoration(color:accent,borderRadius:BorderRadius.circular(size*.28)),child:Icon(Icons.menu_book_rounded,size:size*.56,color:Colors.white));
+
+class Shell extends StatefulWidget{const Shell({super.key});@override State<Shell> createState()=>_ShellState();}
+class _ShellState extends State<Shell>{Page page=Page.latest;MangaItem? selected;bool compact=false,notifications=true,wifiOnly=false;String get title=>selected?.title??switch(page){Page.latest=>'الأحدث',Page.manga=>'المانجا',Page.favorites=>'المفضلة',Page.storage=>'التخزين',Page.notifications=>'الإشعارات',Page.settings=>'الإعدادات',Page.about=>'حول'};void open(Page p)=>setState((){page=p;selected=null;});@override Widget build(BuildContext c)=>Scaffold(drawer:drawer(),appBar:AppBar(backgroundColor:navy,elevation:0,title:Row(children:[_logo(33),const SizedBox(width:10),Text(title,style:const TextStyle(fontWeight:FontWeight.w700,fontSize:20))]),actions:[IconButton(icon:const Icon(Icons.search_rounded),onPressed:()=>showSearch(context:context,delegate:SearchManga((item){setState(()=>selected=item);}))) ]),body:AnimatedSwitcher(duration:const Duration(milliseconds:220),child:selected!=null?Details(item:selected!,back:()=>setState(()=>selected=null),changed:()=>setState((){})):body()));
+Widget body()=>switch(page){Page.latest=>Collection(items:manga,onTap:(x)=>setState(()=>selected=x),compact:compact,header:'آخر التحديثات'),Page.manga=>Collection(items:manga,onTap:(x)=>setState(()=>selected=x),compact:compact,header:'استكشف المانجا'),Page.favorites=>Collection(items:manga.where((x)=>x.favorite).toList(),onTap:(x)=>setState(()=>selected=x),compact:compact,header:'المفضلة'),Page.storage=>storage(),Page.notifications=>notices(),Page.settings=>settings(),Page.about=>about()};
+Widget drawer()=>Drawer(backgroundColor:surface,child:SafeArea(child:Column(children:[Padding(padding:const EdgeInsets.fromLTRB(22,24,22,28),child:Row(children:[_logo(48),const SizedBox(width:13),const Text('MANGA PLUS',style:TextStyle(fontWeight:FontWeight.bold,letterSpacing:1.3,fontSize:17))])),Expanded(child:ListView(padding:EdgeInsets.zero,children:[nav('الأحدث',Icons.auto_awesome_rounded,Page.latest),nav('المانجا',Icons.menu_book_rounded,Page.manga),nav('المفضلة',Icons.favorite_border_rounded,Page.favorites),nav('التخزين',Icons.download_outlined,Page.storage),nav('الإشعارات',Icons.notifications_none_rounded,Page.notifications),const Padding(padding:EdgeInsets.symmetric(horizontal:22,vertical:16),child:Divider(color:surface2)),nav('الإعدادات',Icons.settings_outlined,Page.settings),nav('حول',Icons.info_outline_rounded,Page.about)]))])));
+Widget nav(String text,IconData icon,Page p){final active=page==p&&selected==null;return ListTile(selected:active,selectedTileColor:accent.withOpacity(.12),shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(12)),leading:Icon(icon,color:active?accent:muted),title:Text(text,style:TextStyle(color:active?Colors.white:muted,fontWeight:active?FontWeight.w700:null)),contentPadding:const EdgeInsets.symmetric(horizontal:22),onTap:(){Navigator.pop(context);open(p);});}
+Widget storage()=>ListView(padding:const EdgeInsets.fromLTRB(18,8,18,28),children:[section('المساحة المستخدمة'),Card(color:surface,child:Padding(padding:const EdgeInsets.all(18),child:Column(children:[Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[const Text('الفصول المحفوظة'),Text('0 فصل',style:const TextStyle(color:accent,fontWeight:FontWeight.bold))]),const SizedBox(height:16),const ClipRRect(borderRadius:BorderRadius.all(Radius.circular(8)),child:LinearProgressIndicator(value:.02,minHeight:8,backgroundColor:surface2,color:accent)),const SizedBox(height:12),const Align(alignment:Alignment.centerRight,child:Text('0 MB من 2 GB',style:TextStyle(color:muted)))]))),const SizedBox(height:22),section('التنزيلات'),empty(Icons.download_done_rounded,'لا توجد فصول محفوظة')]);
+Widget notices()=>ListView(padding:const EdgeInsets.fromLTRB(18,8,18,28),children:[section('اليوم'),notice('تحديث جديد','تمت إضافة فصول جديدة إلى ظل التنين',Icons.auto_awesome_rounded),notice('مرحبًا بك','ابدأ بإضافة المانجا إلى المفضلة',Icons.favorite_rounded)]);
+Widget settings()=>ListView(padding:const EdgeInsets.fromLTRB(18,8,18,28),children:[section('التفضيلات'),setting('إشعارات التحديثات','تنبيهات عند صدور فصول جديدة',notifications,(v)=>setState(()=>notifications=v)),setting('التنزيل عبر Wi‑Fi فقط','تقييد التنزيلات على شبكة Wi‑Fi',wifiOnly,(v)=>setState(()=>wifiOnly=v)),setting('عرض مضغوط','تقليل المسافات بين البطاقات',compact,(v)=>setState(()=>compact=v)),const SizedBox(height:20),section('الحساب'),ListTile(leading:const Icon(Icons.login_rounded,color:accent),title:const Text('تسجيل الدخول'),trailing:const Icon(Icons.chevron_left_rounded,color:muted),onTap:() {})]);
+Widget about()=>ListView(padding:const EdgeInsets.fromLTRB(18,8,18,28),children:[const SizedBox(height:18),Center(child:Column(children:[_logo(104),const SizedBox(height:18),const Text('MANGA PLUS',style:TextStyle(fontSize:22,fontWeight:FontWeight.w800,letterSpacing:2)),const SizedBox(height:6),const Text('الإصدار 1.0.0',style:TextStyle(color:muted))])),const SizedBox(height:34),section('التطبيق'),info(Icons.language_rounded,'اللغة','العربية'),info(Icons.shield_outlined,'الخصوصية','سياسة الخصوصية'),info(Icons.info_outline_rounded,'الإصدار','1.0.0+1')]);
+Widget section(String t)=>Padding(padding:const EdgeInsets.only(bottom:12),child:Text(t,style:const TextStyle(color:muted,fontWeight:FontWeight.w700,fontSize:13)));Widget setting(String a,String b,bool v,ValueChanged<bool> f)=>Card(color:surface,margin:const EdgeInsets.only(bottom:10),child:SwitchListTile(value:v,onChanged:f,activeColor:accent,title:Text(a),subtitle:Text(b,style:const TextStyle(color:muted)),secondary:const Icon(Icons.tune_rounded,color:accent)));Widget notice(String a,String b,IconData i)=>Card(color:surface,margin:const EdgeInsets.only(bottom:10),child:ListTile(contentPadding:const EdgeInsets.all(12),leading:CircleAvatar(backgroundColor:accent.withOpacity(.16),child:Icon(i,color:accent)),title:Text(a,style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:Text(b,style:const TextStyle(color:muted)),trailing:const Icon(Icons.chevron_left_rounded,color:muted)));Widget info(IconData i,String a,String b)=>Card(color:surface,margin:const EdgeInsets.only(bottom:10),child:ListTile(leading:Icon(i,color:accent),title:Text(a),trailing:Text(b,style:const TextStyle(color:muted))));Widget empty(IconData i,String t)=>Padding(padding:const EdgeInsets.only(top:90),child:Column(children:[Icon(i,size:54,color:muted),const SizedBox(height:16),Text(t,style:const TextStyle(color:muted))]));}
+
+class Collection extends StatelessWidget{final List<MangaItem> items;final ValueChanged<MangaItem> onTap;final bool compact;final String header;const Collection({super.key,required this.items,required this.onTap,required this.compact,required this.header});@override Widget build(BuildContext c)=>items.isEmpty?const Center(child:Text('لا توجد مانجا مفضلة',style:TextStyle(color:muted))):CustomScrollView(slivers:[SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.fromLTRB(18,10,18,14),child:Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(header,style:const TextStyle(fontSize:16,fontWeight:FontWeight.bold)),Text('${items.length} عناوين',style:const TextStyle(color:muted))]))),SliverPadding(padding:EdgeInsets.fromLTRB(18,0,18,compact?12:24),sliver:SliverGrid(delegate:SliverChildBuilderDelegate((c,i)=>CardManga(item:items[i],tap:()=>onTap(items[i])),childCount:items.length),gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,mainAxisSpacing:14,crossAxisSpacing:14,childAspectRatio:.61))) ]);}
+class CardManga extends StatelessWidget{final MangaItem item;final VoidCallback tap;const CardManga({super.key,required this.item,required this.tap});@override Widget build(BuildContext c)=>InkWell(onTap:tap,borderRadius:BorderRadius.circular(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Expanded(child:ClipRRect(borderRadius:BorderRadius.circular(16),child:Stack(fit:StackFit.expand,children:[Image.asset(item.asset,fit:BoxFit.cover),Positioned(top:8,right:8,child:Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),decoration:BoxDecoration(color:Colors.black54,borderRadius:BorderRadius.circular(8)),child:Text(item.status,style:const TextStyle(fontSize:10,fontWeight:FontWeight.bold))))]))),const SizedBox(height:8),Text(item.title,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:14)),const SizedBox(height:3),Text('${item.chapters} فصل  •  ${item.tags.first}',style:const TextStyle(color:muted,fontSize:11))]));}
+
+class Details extends StatelessWidget {
+  final MangaItem item;
+  final VoidCallback back, changed;
+  const Details({super.key, required this.item, required this.back, required this.changed});
+  @override
+  Widget build(BuildContext c) => CustomScrollView(slivers: [
+    SliverToBoxAdapter(child: Stack(children: [
+      SizedBox(height: 300, width: double.infinity, child: Image.asset(item.asset, fit: BoxFit.cover)),
+      Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black26, navy])))),
+      Positioned(top: 12, right: 12, child: IconButton.filledTonal(onPressed: back, icon: const Icon(Icons.arrow_forward_rounded))),
+      Positioned(bottom: 22, right: 20, left: 20, child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.asset(item.asset, width: 92, height: 132, fit: BoxFit.cover)),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(item.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+          Text(item.subtitle, style: const TextStyle(color: muted)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, children: item.tags.map((x) => Chip(label: Text(x, style: const TextStyle(fontSize: 11)), visualDensity: VisualDensity.compact, side: BorderSide.none, backgroundColor: accent.withOpacity(.18))).toList()),
+        ])),
+      ])),
+    ])),
+    SliverPadding(padding: const EdgeInsets.fromLTRB(20, 4, 20, 30), sliver: SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(child: FilledButton.icon(onPressed: () {}, icon: const Icon(Icons.play_arrow_rounded), label: const Text('ابدأ القراءة'))),
+        const SizedBox(width: 10),
+        IconButton.filledTonal(onPressed: () { item.favorite = !item.favorite; changed(); }, icon: Icon(item.favorite ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: item.favorite ? Colors.redAccent : null)),
+      ]),
+      const SizedBox(height: 24),
+      const Text('نبذة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8),
+      Text(item.description, style: const TextStyle(color: muted, height: 1.7)),
+      const SizedBox(height: 24),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('الفصول', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), Text('${item.chapters} فصل', style: const TextStyle(color: accent))]),
+      const SizedBox(height: 10),
+      ...List.generate(5, (i) => Card(color: surface, child: ListTile(onTap: () {}, leading: CircleAvatar(backgroundColor: accent.withOpacity(.14), child: Text('${item.chapters - i}', style: const TextStyle(color: accent, fontSize: 12))), title: Text('الفصل ${item.chapters - i}'), subtitle: const Text('منذ يومين', style: TextStyle(color: muted)), trailing: const Icon(Icons.download_outlined, color: muted)))),
+    ]))),
+  ]);
+}
+
+class SearchManga extends SearchDelegate<MangaItem?>{final ValueChanged<MangaItem> open;SearchManga(this.open);@override List<Widget>? buildActions(BuildContext c)=>[IconButton(onPressed:()=>query='',icon:const Icon(Icons.clear))];@override Widget? buildLeading(BuildContext c)=>IconButton(onPressed:()=>close(c,null),icon:const Icon(Icons.arrow_back));@override Widget buildResults(BuildContext c)=>results(c);@override Widget buildSuggestions(BuildContext c)=>results(c);Widget results(BuildContext c){final found=manga.where((x)=>x.title.contains(query)||x.subtitle.toLowerCase().contains(query.toLowerCase())).toList();return ListView.builder(itemCount:found.length,itemBuilder:(_,i)=>ListTile(onTap:(){close(c,found[i]);open(found[i]);},leading:Image.asset(found[i].asset,width:44,height:58,fit:BoxFit.cover),title:Text(found[i].title),subtitle:Text(found[i].subtitle,style:const TextStyle(color:muted))));}}
