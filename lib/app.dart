@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'manga_time_service.dart';
+
 const navy = Color(0xFF0B111A);
 const surface = Color(0xFF121C29);
 const surface2 = Color(0xFF1A293B);
@@ -13,109 +15,72 @@ const inkText = Color(0xFFF4F7FB);
 const danger = Color(0xFFFF7474);
 final ValueNotifier<bool> appDarkMode = ValueNotifier<bool>(true);
 
-class MangaItem {
-  final String title;
-  final String subtitle;
-  final String asset;
-  final String description;
-  final String status;
-  final int chapters;
-  final List<String> tags;
-  final String author;
-  final String updated;
-  final double rating;
-  bool favorite;
-
-  MangaItem(
-    this.title,
-    this.subtitle,
-    this.asset,
-    this.description,
-    this.status,
-    this.chapters,
-    this.tags, {
-    required this.author,
-    required this.updated,
-    required this.rating,
-    this.favorite = false,
-  });
+Image mangaImage(String source, {BoxFit fit = BoxFit.cover}) {
+  final provider = source.startsWith('http') ? NetworkImage(source) : AssetImage(source);
+  return Image(image: provider, fit: fit);
 }
 
-final manga = <MangaItem>[
-  MangaItem(
-    'ظل التنين',
-    'Dragon Shade',
-    'assets/covers/dragon.png',
-    'في مدينة معلقة فوق الغيوم، يكتشف شاب هادئ قوة قديمة تغيّر مصير المملكة.',
-    'مستمر',
-    48,
-    ['أكشن', 'فانتازيا'],
-    author: 'رين كاي',
-    updated: 'منذ ساعتين',
-    rating: 4.8,
-    favorite: true,
-  ),
-  MangaItem(
-    'زهرة القمر',
-    'Moon Bloom',
-    'assets/covers/moon.png',
-    'رحلة رومانسية بين ساحرة صغيرة وحارس يحمل سرًا من أسرار القمر.',
-    'مستمر',
-    32,
-    ['رومانسي', 'دراما'],
-    author: 'ميورا هانا',
-    updated: 'أمس',
-    rating: 4.6,
-  ),
-  MangaItem(
-    'آخر صياد',
-    'The Last Hunter',
-    'assets/covers/hunter.png',
-    'بعد انهيار المدن، يبقى صياد واحد يبحث عن الناجين وسط عالم مليء بالوحوش.',
-    'مكتمل',
-    76,
-    ['مغامرة', 'أكشن'],
-    author: 'تاكا يوشي',
-    updated: 'منذ 3 أيام',
-    rating: 4.9,
-  ),
-  MangaItem(
-    'أكاديمية النجوم',
-    'Star Academy',
-    'assets/covers/star.png',
-    'طلاب موهوبون يتنافسون لصناعة مستقبل جديد بين النجوم.',
-    'مستمر',
-    25,
-    ['مدرسي', 'خيال'],
-    author: 'سورا آكي',
-    updated: 'منذ 5 أيام',
-    rating: 4.4,
-  ),
-  MangaItem(
-    'متاهة الزجاج',
-    'Glass Maze',
-    'assets/covers/glass.png',
-    'كل باب في المتاهة يكشف ذكرى، وكل ذكرى تقرّب البطلة من الحقيقة.',
-    'مستمر',
-    19,
-    ['غموض', 'دراما'],
-    author: 'إيما ناغي',
-    updated: 'منذ أسبوع',
-    rating: 4.7,
-  ),
-  MangaItem(
-    'مقهى منتصف الليل',
-    'Midnight Cafe',
-    'assets/covers/cafe.png',
-    'مقهى لا يفتح إلا بعد منتصف الليل، ويستقبل زوارًا من عوالم مختلفة.',
-    'مكتمل',
-    41,
-    ['شريحة من الحياة', 'فانتازيا'],
-    author: 'نورا كاي',
-    updated: 'منذ أسبوعين',
-    rating: 4.5,
-  ),
-];
+String ratingLabel(double rating) => rating > 0 ? rating.toStringAsFixed(1) : '—';
+
+class MangaItem {
+  final String id;
+  final String slug;
+  final String type;
+  String title;
+  String subtitle;
+  String asset;
+  String description;
+  String status;
+  int chapters;
+  List<String> tags;
+  String author;
+  String updated;
+  double rating;
+  String latestChapterNumber;
+  DateTime? latestDate;
+  bool favorite;
+  List<MangaTimeChapter> remoteChapters = [];
+
+  MangaItem.remote(MangaTimeSeries series)
+      : id = series.id,
+        slug = series.slug,
+        type = series.type,
+        title = series.title,
+        subtitle = series.nameEn,
+        asset = series.coverUrl,
+        description = series.description,
+        status = series.status,
+        chapters = series.chapterCount,
+        tags = series.genres,
+        author = '',
+        updated = mangaTimeRelativeDate(series.latestDate),
+        rating = series.rating,
+        latestChapterNumber = series.latestChapter ?? '',
+        latestDate = series.latestDate,
+        favorite = false;
+
+  String get key => slug.isNotEmpty ? slug : id;
+
+  void updateFrom(MangaTimeSeries series) {
+    title = series.title;
+    subtitle = series.nameEn;
+    asset = series.coverUrl;
+    description = series.description;
+    status = series.status;
+    chapters = series.chapterCount;
+    tags = series.genres;
+    rating = series.rating;
+    if (series.latestChapter != null && series.latestChapter!.isNotEmpty) {
+      latestChapterNumber = series.latestChapter!;
+    }
+    if (series.latestDate != null) {
+      latestDate = series.latestDate;
+      updated = mangaTimeRelativeDate(series.latestDate);
+    }
+  }
+}
+
+final manga = <MangaItem>[];
 
 enum Page { latest, manga, favorites, storage, notifications, settings, about }
 
@@ -329,9 +294,78 @@ class _ShellState extends State<Shell> {
   bool chaptersDescending = true;
   final Map<String, Map<int, ChapterRecord>> records = {};
   final List<DownloadTask> tasks = [];
+  final MangaTimeService source = MangaTimeService();
+  List<MangaItem> latestItems = [];
+  List<MangaItem> catalogItems = [];
+  bool sourceLoading = true;
+  String? sourceError;
   bool searching = false;
   String searchQuery = '';
+  List<MangaItem> remoteSearchItems = [];
+  bool searchLoading = false;
+  Timer? searchDebounce;
   Color themeColor = accent;
+
+  @override
+  void initState() {
+    super.initState();
+    refreshSource();
+  }
+
+  Future<void> refreshSource() async {
+    if (mounted) setState(() { sourceLoading = true; sourceError = null; });
+    try {
+      final results = await Future.wait([
+        source.searchSeries(sortBy: 'recent'),
+        source.searchSeries(sortBy: 'popularity'),
+      ]);
+      final existing = {for (final item in manga) item.key: item};
+      final canonical = <String, MangaItem>{};
+      MangaItem mapSeries(MangaTimeSeries series) {
+        final item = existing[series.slug] ?? MangaItem.remote(series);
+        item.updateFrom(series);
+        return canonical.putIfAbsent(item.key, () => item);
+      }
+      final latest = results[0].map(mapSeries).toList();
+      final catalog = results[1].map(mapSeries).toList();
+      manga
+        ..clear()
+        ..addAll(canonical.values);
+      if (!mounted) return;
+      setState(() {
+        latestItems = latest;
+        catalogItems = catalog;
+        sourceLoading = false;
+      });
+      await restoreDownloads();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        sourceLoading = false;
+        sourceError = error.toString();
+      });
+    }
+  }
+
+  Future<void> restoreDownloads() async {
+    final entries = await source.readDownloadedManifest();
+    for (final entry in entries) {
+      final parts = entry.split('|');
+      if (parts.length != 2) continue;
+      MangaItem? item;
+      for (final candidate in manga) {
+        if (candidate.slug == parts[0]) {
+          item = candidate;
+          break;
+        }
+      }
+      final number = int.tryParse(parts[1]);
+      if (item != null && number != null) {
+        recordFor(item, number).download = DownloadStatus.success;
+      }
+    }
+    if (mounted) setState(() {});
+  }
 
   Map<int, ChapterRecord> recordsFor(MangaItem item) =>
       records.putIfAbsent(item.title, () => {});
@@ -349,19 +383,6 @@ class _ShellState extends State<Shell> {
   void enqueueDownload(MangaItem item, List<int> numbers) {
     final chapters = numbers.toSet().toList()..sort((a, b) => b.compareTo(a));
     if (chapters.isEmpty) return;
-    if (!online) {
-      setState(() {
-        for (final number in chapters) {
-          recordFor(item, number).download = DownloadStatus.failed;
-        }
-        tasks.insert(
-          0,
-          DownloadTask(item, chapters)..status = DownloadStatus.failed,
-        );
-      });
-      return;
-    }
-
     final task = DownloadTask(item, chapters);
     setState(() {
       tasks.insert(0, task);
@@ -370,23 +391,38 @@ class _ShellState extends State<Shell> {
       }
       task.status = DownloadStatus.downloading;
     });
+    _downloadTask(task, item, chapters);
+  }
 
-    task.timer = Timer.periodic(const Duration(milliseconds: 180), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
+  Future<void> _downloadTask(DownloadTask task, MangaItem item, List<int> chapters) async {
+    try {
+      if (!online) throw StateError('لا يوجد اتصال');
+      await source.downloadChapters(
+        slug: item.slug,
+        chapterNumbers: chapters.map((number) => number.toString()).toList(),
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() => task.progress = progress);
+        },
+      );
+      if (!mounted) return;
+      await source.markDownloaded(item.slug, chapters.map((number) => number.toString()).toList());
       setState(() {
-        task.progress = (task.progress + .12).clamp(0.0, 1.0).toDouble();
-        if (task.progress >= 1) {
-          task.status = DownloadStatus.success;
-          for (final number in chapters) {
-            recordFor(item, number).download = DownloadStatus.success;
-          }
-          timer.cancel();
+        task.status = DownloadStatus.success;
+        task.progress = 1;
+        for (final number in chapters) {
+          recordFor(item, number).download = DownloadStatus.success;
         }
       });
-    });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        task.status = DownloadStatus.failed;
+        for (final number in chapters) {
+          recordFor(item, number).download = DownloadStatus.failed;
+        }
+      });
+    }
   }
 
   void setRead(MangaItem item, List<int> numbers, bool value) => setState(() {
@@ -424,6 +460,7 @@ class _ShellState extends State<Shell> {
       selected = null;
       searching = false;
       searchQuery = '';
+      remoteSearchItems = [];
     });
   }
 
@@ -438,6 +475,42 @@ class _ShellState extends State<Shell> {
             item.title.toLowerCase().contains(query) ||
             item.subtitle.toLowerCase().contains(query))
         .toList();
+  }
+
+  void updateSearch(String value) {
+    setState(() {
+      searchQuery = value;
+      if (value.trim().isEmpty) remoteSearchItems = [];
+    });
+    if (page == Page.favorites || value.trim().length < 2) return;
+    searchDebounce?.cancel();
+    searchDebounce = Timer(const Duration(milliseconds: 380), () => searchRemote(value.trim()));
+  }
+
+  Future<void> searchRemote(String query) async {
+    if (!mounted) return;
+    setState(() => searchLoading = true);
+    try {
+      final result = await source.searchSeries(sortBy: 'popularity', query: query);
+      final existing = {for (final item in manga) item.key: item};
+      final mapped = result.map((series) {
+        final item = existing[series.slug] ?? MangaItem.remote(series);
+        item.updateFrom(series);
+        return item;
+      }).toList();
+      if (mounted && searchQuery.trim() == query) {
+        setState(() => remoteSearchItems = mapped);
+      }
+    } finally {
+      if (mounted) setState(() => searchLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    searchDebounce?.cancel();
+    source.close();
+    super.dispose();
   }
 
   void showSortMenu() {
@@ -522,6 +595,7 @@ class _ShellState extends State<Shell> {
           child: hasDetails
               ? Details(
                   item: selected!,
+                  source: source,
                   records: recordsFor(selected!),
                   downloadedOnly: page == Page.storage,
                   back: () => setState(() => selected = null),
@@ -551,7 +625,7 @@ class _ShellState extends State<Shell> {
         titleSpacing: 0,
         title: TextField(
           autofocus: true,
-          onChanged: (value) => setState(() => searchQuery = value),
+          onChanged: updateSearch,
           style: const TextStyle(color: inkText, fontSize: 16),
           decoration: const InputDecoration(
             hintText: 'بحث',
@@ -563,7 +637,7 @@ class _ShellState extends State<Shell> {
           if (searchQuery.isNotEmpty)
             IconButton(
               tooltip: 'مسح',
-              onPressed: () => setState(() => searchQuery = ''),
+              onPressed: () => updateSearch(''),
               icon: const Icon(Icons.clear_rounded),
             ),
         ],
@@ -605,19 +679,38 @@ class _ShellState extends State<Shell> {
     if (!online) {
       return OfflineState(onRetry: () => setState(() => online = true));
     }
-    final allItems = ordered(manga);
+    if (sourceLoading) {
+      return const Center(child: CircularProgressIndicator(color: accent));
+    }
+    if (sourceError != null && latestItems.isEmpty) {
+      return EmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: 'تعذر الاتصال بالمصدر',
+        description: '',
+        action: 'إعادة المحاولة',
+        onAction: refreshSource,
+      );
+    }
+    final allItems = ordered(catalogItems);
     final favoriteItems = ordered(manga.where((item) => item.favorite).toList());
+    final searchingRemote = searchQuery.trim().isNotEmpty && page != Page.favorites;
+    if (searchingRemote && searchLoading && remoteSearchItems.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: accent));
+    }
+    final latestResults = searchingRemote ? remoteSearchItems : latestItems;
+    final catalogResults = searchingRemote ? remoteSearchItems : allItems;
     return switch (page) {
       Page.latest => Collection(
-          items: filtered(allItems),
+          items: filtered(latestResults),
           onTap: (item) => setState(() => selected = item),
           compact: compact,
           header: 'آخر التحديثات',
           helper: '',
+          latestView: true,
           featured: !searching && searchQuery.isEmpty,
         ),
       Page.manga => Collection(
-          items: filtered(allItems),
+          items: filtered(catalogResults),
           onTap: (item) => setState(() => selected = item),
           compact: compact,
           header: 'كل المانجا',
@@ -1025,6 +1118,7 @@ class Collection extends StatelessWidget {
   final String header;
   final String helper;
   final bool featured;
+  final bool latestView;
 
   const Collection({
     super.key,
@@ -1034,6 +1128,7 @@ class Collection extends StatelessWidget {
     required this.header,
     required this.helper,
     this.featured = false,
+    this.latestView = false,
   });
 
   @override
@@ -1063,6 +1158,7 @@ class Collection extends StatelessWidget {
               (context, index) => CardManga(
                 item: items[index],
                 index: index,
+                latestView: latestView,
                 tap: () => onTap(items[index]),
               ),
               childCount: items.length,
@@ -1131,7 +1227,7 @@ class FeaturedBanner extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.asset(item.asset, fit: BoxFit.cover),
+              mangaImage(item.asset),
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -1192,9 +1288,10 @@ class FeaturedBanner extends StatelessWidget {
 class CardManga extends StatelessWidget {
   final MangaItem item;
   final int index;
+  final bool latestView;
   final VoidCallback tap;
 
-  const CardManga({super.key, required this.item, required this.index, required this.tap});
+  const CardManga({super.key, required this.item, required this.index, this.latestView = false, required this.tap});
 
   @override
   Widget build(BuildContext context) {
@@ -1207,7 +1304,7 @@ class CardManga extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _CoverFrame(item: item, hero: true)),
+            Expanded(child: _CoverFrame(item: item, hero: true, chapter: latestView ? item.latestChapterNumber : null)),
             const SizedBox(height: 9),
             Text(
               item.title,
@@ -1221,18 +1318,20 @@ class CardManga extends StatelessWidget {
                 const Icon(Icons.star_rounded, color: Color(0xFFFFC857), size: 13),
                 const SizedBox(width: 3),
                 Text(
-                  item.rating.toStringAsFixed(1),
+                  ratingLabel(item.rating),
                   style: const TextStyle(color: inkText, fontSize: 10, fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: Text(
-                    '${item.chapters} فصل',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: muted, fontSize: 10),
+                if (latestView) ...[
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      item.updated,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: muted, fontSize: 10),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ],
@@ -1245,12 +1344,13 @@ class CardManga extends StatelessWidget {
 class _CoverFrame extends StatelessWidget {
   final MangaItem item;
   final bool hero;
+  final String? chapter;
 
-  const _CoverFrame({required this.item, this.hero = false});
+  const _CoverFrame({required this.item, this.hero = false, this.chapter});
 
   @override
   Widget build(BuildContext context) {
-    final image = Image.asset(item.asset, fit: BoxFit.cover);
+    final image = mangaImage(item.asset);
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: Stack(
@@ -1293,7 +1393,18 @@ class _CoverFrame extends StatelessWidget {
               left: 10,
               child: Icon(Icons.favorite_rounded, color: Color(0xFFFF7890), size: 17),
             ),
-          Positioned(
+          if (chapter != null && chapter!.isNotEmpty)
+            Positioned(
+              bottom: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(color: navy.withOpacity(.82), borderRadius: BorderRadius.circular(9)),
+                child: Text('الفصل $chapter', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+              ),
+            ),
+          if (chapter == null || chapter!.isEmpty)
+            Positioned(
             right: 11,
             left: 11,
             bottom: 11,
@@ -1312,6 +1423,7 @@ class _CoverFrame extends StatelessWidget {
 
 class Details extends StatefulWidget {
   final MangaItem item;
+  final MangaTimeService source;
   final VoidCallback back;
   final VoidCallback changed;
   final Map<int, ChapterRecord> records;
@@ -1322,6 +1434,7 @@ class Details extends StatefulWidget {
   const Details({
     super.key,
     required this.item,
+    required this.source,
     required this.back,
     required this.changed,
     required this.records,
@@ -1337,6 +1450,30 @@ class Details extends StatefulWidget {
 class _DetailsState extends State<Details> {
   final Set<int> selected = {};
   bool selecting = false;
+  bool loadingSource = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.item.slug.isNotEmpty && widget.item.remoteChapters.isEmpty) {
+      loadRemoteDetails();
+    }
+  }
+
+  Future<void> loadRemoteDetails() async {
+    setState(() => loadingSource = true);
+    try {
+      final data = await widget.source.fetchDetails(widget.item.slug);
+      widget.item.updateFrom(data.series);
+      widget.item.author = data.author ?? '';
+      widget.item.remoteChapters = data.chapters;
+      widget.item.chapters = data.chapters.length;
+    } catch (_) {
+      // Keep the cached catalog data visible if the details request is unavailable.
+    } finally {
+      if (mounted) setState(() => loadingSource = false);
+    }
+  }
 
   int get readCount => widget.records.values.where((record) => record.read).length;
 
@@ -1352,19 +1489,19 @@ class _DetailsState extends State<Details> {
 
   @override
   Widget build(BuildContext context) {
-    final availableChapters = List.generate(
-      widget.item.chapters,
-      (index) => widget.item.chapters - index,
-    ).where(
-      (number) =>
-          !widget.downloadedOnly ||
-          widget.records[number]?.download == DownloadStatus.success,
-    );
+    final remoteChapters = widget.item.remoteChapters;
+    final availableChapters = (remoteChapters.isEmpty
+            ? List.generate(widget.item.chapters, (index) => MangaTimeChapter(
+                id: '', number: '${widget.item.chapters - index}', title: '', publishedAt: null, pageCount: 0, unlocked: true))
+            : remoteChapters)
+        .where((chapter) => !widget.downloadedOnly || widget.records[int.tryParse(chapter.number) ?? 0]?.download == DownloadStatus.success)
+        .toList();
 
     return SafeArea(
       top: true,
       child: CustomScrollView(
         slivers: [
+          if (loadingSource) const SliverToBoxAdapter(child: LinearProgressIndicator(minHeight: 2, color: accent)),
           SliverToBoxAdapter(child: _detailsHero()),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 38),
@@ -1406,8 +1543,7 @@ class _DetailsState extends State<Details> {
                     SelectionBar(
                       selected: selected,
                       total: widget.item.chapters,
-                      onAll: () => setState(() => selected.addAll(
-                            List.generate(widget.item.chapters, (index) => widget.item.chapters - index),
+                      onAll: () => setState(() => selected.addAll(availableChapters.map((chapter) => int.tryParse(chapter.number) ?? 0),
                           )),
                       onDownload: () {
                         widget.onDownload(selected.toList());
@@ -1426,40 +1562,32 @@ class _DetailsState extends State<Details> {
                     ),
                     const SizedBox(height: 10),
                   ],
-                  ...availableChapters.take(12).map(
-                    (number) => ChapterTile(
-                      number: number,
-                      record: widget.records[number],
-                      selected: selected.contains(number),
-                      onLongPress: () => setState(() {
-                        selecting = true;
-                        selected.add(number);
-                      }),
-                      onTap: () {
-                        if (selecting) {
-                          setState(() {
-                            selected.contains(number)
-                                ? selected.remove(number)
-                                : selected.add(number);
-                            if (selected.isEmpty) selecting = false;
-                          });
-                        } else {
-                          widget.records.putIfAbsent(number, ChapterRecord.new).read = true;
-                          widget.changed();
-                        }
-                      },
-                    ),
+                  ...availableChapters.map(
+                    (chapter) {
+                      final number = int.tryParse(chapter.number) ?? 0;
+                      return ChapterTile(
+                        number: number,
+                        dateLabel: mangaTimeRelativeDate(chapter.publishedAt),
+                        record: widget.records[number],
+                        selected: selected.contains(number),
+                        onLongPress: () => setState(() {
+                          selecting = true;
+                          selected.add(number);
+                        }),
+                        onTap: () {
+                          if (selecting) {
+                            setState(() {
+                              selected.contains(number) ? selected.remove(number) : selected.add(number);
+                              if (selected.isEmpty) selecting = false;
+                            });
+                          } else {
+                            widget.records.putIfAbsent(number, ChapterRecord.new).read = true;
+                            widget.changed();
+                          }
+                        },
+                      );
+                    },
                   ),
-                  if (availableChapters.length > 12) ...[
-                    const SizedBox(height: 4),
-                    Center(
-                      child: TextButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.expand_more_rounded),
-                        label: Text('عرض بقية الفصول (${availableChapters.length - 12})'),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -1475,7 +1603,7 @@ class _DetailsState extends State<Details> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(widget.item.asset, fit: BoxFit.cover),
+          mangaImage(widget.item.asset),
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -1522,7 +1650,7 @@ class _DetailsState extends State<Details> {
                     height: 154,
                     child: Hero(
                       tag: 'manga-${widget.item.asset}',
-                      child: Image.asset(widget.item.asset, fit: BoxFit.cover),
+                      child: mangaImage(widget.item.asset),
                     ),
                   ),
                 ),
@@ -1543,6 +1671,11 @@ class _DetailsState extends State<Details> {
                         Text(
                           widget.item.subtitle,
                           style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '⭐${ratingLabel(widget.item.rating)}  ·  ${widget.item.updated}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 11),
                         Wrap(
@@ -1767,6 +1900,7 @@ class SelectionBar extends StatelessWidget {
 class ChapterTile extends StatelessWidget {
   final int number;
   final ChapterRecord? record;
+  final String? dateLabel;
   final bool selected;
   final VoidCallback onLongPress;
   final VoidCallback onTap;
@@ -1775,6 +1909,7 @@ class ChapterTile extends StatelessWidget {
     super.key,
     required this.number,
     this.record,
+    this.dateLabel,
     required this.selected,
     required this.onLongPress,
     required this.onTap,
@@ -1835,7 +1970,7 @@ class ChapterTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        record?.read == true ? 'مقروء' : 'غير مقروء',
+                        dateLabel ?? (record?.read == true ? 'مقروء' : 'غير مقروء'),
                         style: const TextStyle(color: muted, fontSize: 10),
                       ),
                     ],
@@ -1910,7 +2045,7 @@ class DownloadTaskCard extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(11),
-                child: Image.asset(task.item.asset, width: 47, height: 62, fit: BoxFit.cover),
+                child: Image(image: task.item.asset.startsWith('http') ? NetworkImage(task.item.asset) : AssetImage(task.item.asset), width: 47, height: 62, fit: BoxFit.cover),
               ),
               const SizedBox(width: 12),
               Expanded(
