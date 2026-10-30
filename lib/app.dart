@@ -2195,9 +2195,7 @@ class _SettingsProfile extends StatelessWidget {
 class SearchManga extends SearchDelegate<MangaItem?> {
   final ValueChanged<MangaItem> open;
 
-  SearchManga(this.open) {
-    searchFieldLabel = 'ابحث عن عنوان أو اسم إنجليزي';
-  }
+  SearchManga(this.open);
 
   @override
   ThemeData appBarTheme(BuildContext context) {
