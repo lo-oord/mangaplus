@@ -16,7 +16,9 @@ const danger = Color(0xFFFF7474);
 final ValueNotifier<bool> appDarkMode = ValueNotifier<bool>(true);
 
 Image mangaImage(String source, {BoxFit fit = BoxFit.cover, double? width, double? height}) {
-  final ImageProvider<Object> provider = source.startsWith('http') ? NetworkImage(source) : AssetImage(source);
+  final ImageProvider<Object> provider = source.startsWith('http')
+      ? NetworkImage(source) as ImageProvider<Object>
+      : AssetImage(source) as ImageProvider<Object>;
   return Image(image: provider, fit: fit, width: width, height: height);
 }
 
@@ -301,6 +303,11 @@ class _ShellState extends State<Shell> {
   List<MangaItem> catalogItems = [];
   bool sourceLoading = true;
   String? sourceError;
+  int latestPage = 1;
+  int catalogPage = 1;
+  bool latestHasMore = true;
+  bool catalogHasMore = true;
+  bool loadingMore = false;
   bool searching = false;
   String searchQuery = '';
   List<MangaItem> remoteSearchItems = [];
@@ -337,6 +344,10 @@ class _ShellState extends State<Shell> {
       setState(() {
         latestItems = latest;
         catalogItems = catalog;
+        latestPage = 1;
+        catalogPage = 1;
+        latestHasMore = results[0].length >= 24;
+        catalogHasMore = results[1].length >= 24;
         sourceLoading = false;
       });
       await restoreDownloads();
@@ -367,6 +378,48 @@ class _ShellState extends State<Shell> {
       }
     }
     if (mounted) setState(() {});
+  }
+
+  Future<void> loadMore(Page target) async {
+    if (sourceLoading || loadingMore || searchQuery.trim().isNotEmpty) return;
+    final isLatest = target == Page.latest;
+    if (isLatest ? !latestHasMore : !catalogHasMore) return;
+    setState(() => loadingMore = true);
+    try {
+      final nextPage = (isLatest ? latestPage : catalogPage) + 1;
+      final response = await source.searchSeries(
+        sortBy: isLatest ? 'recent' : 'popularity',
+        page: nextPage,
+      );
+      final existing = {for (final item in manga) item.key: item};
+      final targetKeys = (isLatest ? latestItems : catalogItems).map((item) => item.key).toSet();
+      final additions = <MangaItem>[];
+      for (final series in response) {
+        final item = existing[series.slug] ?? MangaItem.remote(series);
+        item.updateFrom(series);
+        if (!existing.containsKey(item.key)) {
+          existing[item.key] = item;
+          manga.add(item);
+        }
+        if (targetKeys.add(item.key)) additions.add(item);
+      }
+      if (mounted) {
+        setState(() {
+          if (isLatest) {
+            latestItems = [...latestItems, ...additions];
+            latestPage = nextPage;
+            latestHasMore = response.length >= 24;
+          } else {
+            catalogItems = [...catalogItems, ...additions];
+            catalogPage = nextPage;
+            catalogHasMore = response.length >= 24;
+          }
+          loadingMore = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => loadingMore = false);
+    }
   }
 
   Map<int, ChapterRecord> recordsFor(MangaItem item) =>
@@ -709,6 +762,7 @@ class _ShellState extends State<Shell> {
           header: 'آخر التحديثات',
           helper: '',
           latestView: true,
+          onLoadMore: () => loadMore(Page.latest),
           featured: !searching && searchQuery.isEmpty,
         ),
       Page.manga => Collection(
@@ -717,6 +771,7 @@ class _ShellState extends State<Shell> {
           compact: compact,
           header: 'كل المانجا',
           helper: '',
+          onLoadMore: () => loadMore(Page.manga),
         ),
       Page.favorites => Collection(
           items: filtered(favoriteItems),
@@ -1121,6 +1176,7 @@ class Collection extends StatelessWidget {
   final String helper;
   final bool featured;
   final bool latestView;
+  final VoidCallback? onLoadMore;
 
   const Collection({
     super.key,
@@ -1131,6 +1187,7 @@ class Collection extends StatelessWidget {
     required this.helper,
     this.featured = false,
     this.latestView = false,
+    this.onLoadMore,
   });
 
   @override
@@ -1143,37 +1200,48 @@ class Collection extends StatelessWidget {
       );
     }
 
-    return CustomScrollView(
-      slivers: [
-        if (featured)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
-              child: FeaturedBanner(item: items.first, onTap: () => onTap(items.first)),
-            ),
-          ),
-        SliverToBoxAdapter(child: SizedBox(height: featured ? 0 : 14)),
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(18, 0, 18, compact ? 16 : 30),
-          sliver: SliverGrid(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => CardManga(
-                item: items[index],
-                index: index,
-                latestView: latestView,
-                tap: () => onTap(items[index]),
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.pixels >= notification.metrics.maxScrollExtent - 500) {
+          onLoadMore?.call();
+        }
+        return false;
+      },
+      child: CustomScrollView(
+        slivers: [
+          if (featured)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+                child: FeaturedBanner(item: items.first, onTap: () => onTap(items.first)),
               ),
-              childCount: items.length,
             ),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 182,
-              mainAxisSpacing: 18,
-              crossAxisSpacing: 14,
-              childAspectRatio: .62,
+          SliverToBoxAdapter(child: SizedBox(height: featured ? 0 : 14)),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(18, 0, 18, compact ? 16 : 30),
+            sliver: SliverGrid(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final itemIndex = featured ? index + 1 : index;
+                  return CardManga(
+                    item: items[itemIndex],
+                    index: itemIndex,
+                    latestView: latestView,
+                    tap: () => onTap(items[itemIndex]),
+                  );
+                },
+                childCount: featured ? items.length - 1 : items.length,
+              ),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 182,
+                mainAxisSpacing: 18,
+                crossAxisSpacing: 14,
+                childAspectRatio: .65,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
