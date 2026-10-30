@@ -11,6 +11,7 @@ const teal = Color(0xFF65DED5);
 const muted = Color(0xFF91A2B5);
 const inkText = Color(0xFFF4F7FB);
 const danger = Color(0xFFFF7474);
+final ValueNotifier<bool> appDarkMode = ValueNotifier<bool>(true);
 
 class MangaItem {
   final String title;
@@ -145,36 +146,39 @@ class MangaPlusApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Manga Plus',
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: navy,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: accent,
-          brightness: Brightness.dark,
-          surface: surface,
+    return ValueListenableBuilder<bool>(
+      valueListenable: appDarkMode,
+      builder: (context, dark, _) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Manga Plus',
+        theme: ThemeData(
+          useMaterial3: true,
+          brightness: dark ? Brightness.dark : Brightness.light,
+          scaffoldBackgroundColor: dark ? navy : const Color(0xFFF5F7FB),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: accent,
+            brightness: dark ? Brightness.dark : Brightness.light,
+            surface: dark ? surface : Colors.white,
+          ),
+          appBarTheme: AppBarTheme(
+            backgroundColor: dark ? navy : const Color(0xFFF5F7FB),
+            foregroundColor: dark ? inkText : const Color(0xFF152033),
+            elevation: 0,
+            centerTitle: false,
+          ),
+          dividerColor: dark ? surface3 : const Color(0xFFE3E8F0),
+          textTheme: TextTheme(
+            bodyLarge: TextStyle(color: dark ? inkText : const Color(0xFF152033), height: 1.45),
+            bodyMedium: TextStyle(color: dark ? muted : const Color(0xFF627085), height: 1.45),
+            titleLarge: TextStyle(color: dark ? inkText : const Color(0xFF152033), fontWeight: FontWeight.w800),
+          ),
         ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: navy,
-          foregroundColor: inkText,
-          elevation: 0,
-          centerTitle: false,
+        builder: (context, child) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: child ?? const SizedBox.shrink(),
         ),
-        dividerColor: surface3,
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: inkText, height: 1.45),
-          bodyMedium: TextStyle(color: muted, height: 1.45),
-          titleLarge: TextStyle(color: inkText, fontWeight: FontWeight.w800),
-        ),
+        home: const Splash(),
       ),
-      builder: (context, child) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: child ?? const SizedBox.shrink(),
-      ),
-      home: const Splash(),
     );
   }
 }
@@ -190,18 +194,11 @@ class _SplashState extends State<Splash> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 900), () {
+    Future.delayed(const Duration(milliseconds: 700), () {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          PageRouteBuilder(
-            transitionDuration: const Duration(milliseconds: 520),
-            pageBuilder: (_, animation, __) => const Shell(),
-            transitionsBuilder: (_, animation, __, child) => FadeTransition(
-              opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-              child: child,
-            ),
-          ),
+          MaterialPageRoute(builder: (_) => const Shell()),
         );
       }
     });
@@ -210,36 +207,23 @@ class _SplashState extends State<Splash> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: navy,
+      backgroundColor: Colors.white,
       body: Center(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: .82, end: 1),
-          duration: const Duration(milliseconds: 700),
-          curve: Curves.easeOutBack,
-          builder: (_, value, child) => Transform.scale(
-            scale: value,
-            child: child,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _logo(94),
-              const SizedBox(height: 20),
-              const Text(
-                'MANGA PLUS',
-                style: TextStyle(
-                  letterSpacing: 3.2,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _logo(118),
+            const SizedBox(height: 18),
+            const Text(
+              'MANGA PLUS',
+              style: TextStyle(
+                color: navy,
+                letterSpacing: 3.2,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'اقرأ قصتك القادمة',
-                style: TextStyle(color: muted, fontSize: 12),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -247,28 +231,13 @@ class _SplashState extends State<Splash> {
 }
 
 Widget _logo(double size) {
-  return Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [accent, teal],
-        begin: Alignment.topRight,
-        end: Alignment.bottomLeft,
-      ),
-      borderRadius: BorderRadius.circular(size * .28),
-      boxShadow: [
-        BoxShadow(
-          color: accent.withOpacity(.2),
-          blurRadius: 24,
-          offset: const Offset(0, 10),
-        ),
-      ],
-    ),
-    child: Icon(
-      Icons.menu_book_rounded,
-      size: size * .56,
-      color: navy,
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(size * .22),
+    child: Container(
+      width: size,
+      height: size,
+      color: Colors.white,
+      child: Image.asset('assets/app_logo.png', fit: BoxFit.contain),
     ),
   );
 }
@@ -310,12 +279,6 @@ class EmptyState extends StatelessWidget {
             Text(
               title,
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              description,
-              style: const TextStyle(color: muted, fontSize: 12, height: 1.6),
               textAlign: TextAlign.center,
             ),
             if (action != null) ...[
@@ -366,6 +329,9 @@ class _ShellState extends State<Shell> {
   bool chaptersDescending = true;
   final Map<String, Map<int, ChapterRecord>> records = {};
   final List<DownloadTask> tasks = [];
+  bool searching = false;
+  String searchQuery = '';
+  Color themeColor = accent;
 
   Map<int, ChapterRecord> recordsFor(MangaItem item) =>
       records.putIfAbsent(item.title, () => {});
@@ -436,21 +402,9 @@ class _ShellState extends State<Shell> {
       Page.manga => 'استكشف',
       Page.favorites => 'المفضلة',
       Page.storage => 'التخزين',
-      Page.notifications => 'النشاط',
+      Page.notifications => 'التحميلات',
       Page.settings => 'الإعدادات',
       Page.about => 'حول التطبيق',
-    };
-  }
-
-  String get subtitle {
-    return switch (page) {
-      Page.latest => 'فصول جديدة تستحق وقتك',
-      Page.manga => 'كل القصص في مكان واحد',
-      Page.favorites => 'اختياراتك المحفوظة',
-      Page.storage => 'اقرأ بلا اتصال',
-      Page.notifications => 'تابع التنزيلات والقراءة',
-      Page.settings => 'اضبط تجربتك كما تحب',
-      Page.about => 'تجربة قراءة هادئة ومركزة',
     };
   }
 
@@ -468,7 +422,22 @@ class _ShellState extends State<Shell> {
     setState(() {
       page = nextPage;
       selected = null;
+      searching = false;
+      searchQuery = '';
     });
+  }
+
+  bool get canSearch =>
+      page == Page.latest || page == Page.manga || page == Page.favorites;
+
+  List<MangaItem> filtered(List<MangaItem> source) {
+    final query = searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return source;
+    return source
+        .where((item) =>
+            item.title.toLowerCase().contains(query) ||
+            item.subtitle.toLowerCase().contains(query))
+        .toList();
   }
 
   void showSortMenu() {
@@ -568,8 +537,41 @@ class _ShellState extends State<Shell> {
   }
 
   PreferredSizeWidget _appBar() {
+    if (searching) {
+      return AppBar(
+        toolbarHeight: 64,
+        leading: IconButton(
+          tooltip: 'إغلاق البحث',
+          onPressed: () => setState(() {
+            searching = false;
+            searchQuery = '';
+          }),
+          icon: const Icon(Icons.arrow_forward_rounded),
+        ),
+        titleSpacing: 0,
+        title: TextField(
+          autofocus: true,
+          onChanged: (value) => setState(() => searchQuery = value),
+          style: const TextStyle(color: inkText, fontSize: 16),
+          decoration: const InputDecoration(
+            hintText: 'بحث',
+            hintStyle: TextStyle(color: muted),
+            border: InputBorder.none,
+          ),
+        ),
+        actions: [
+          if (searchQuery.isNotEmpty)
+            IconButton(
+              tooltip: 'مسح',
+              onPressed: () => setState(() => searchQuery = ''),
+              icon: const Icon(Icons.clear_rounded),
+            ),
+        ],
+      );
+    }
+
     return AppBar(
-      toolbarHeight: 76,
+      toolbarHeight: 64,
       leading: Builder(
         builder: (context) => IconButton(
           tooltip: 'فتح القائمة',
@@ -577,45 +579,23 @@ class _ShellState extends State<Shell> {
           icon: const Icon(Icons.menu_rounded),
         ),
       ),
-      titleSpacing: 0,
-      title: Row(
-        children: [
-          _logo(36),
-          const SizedBox(width: 11),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(color: muted, fontSize: 10.5),
-              ),
-            ],
-          ),
-        ],
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
       ),
       actions: [
-        IconButton(
-          tooltip: 'ترتيب',
-          icon: const Icon(Icons.tune_rounded),
-          onPressed: showSortMenu,
-        ),
-        IconButton(
-          tooltip: 'بحث',
-          icon: const Icon(Icons.search_rounded),
-          onPressed: () => showSearch(
-            context: context,
-            delegate: SearchManga((item) {
-              setState(() => selected = item);
-            }),
+        if (canSearch)
+          IconButton(
+            tooltip: 'بحث',
+            icon: const Icon(Icons.search_rounded),
+            onPressed: () => setState(() => searching = true),
           ),
-        ),
+        if (canSearch)
+          IconButton(
+            tooltip: 'ترتيب',
+            icon: const Icon(Icons.tune_rounded),
+            onPressed: showSortMenu,
+          ),
         const SizedBox(width: 6),
       ],
     );
@@ -625,28 +605,30 @@ class _ShellState extends State<Shell> {
     if (!online) {
       return OfflineState(onRetry: () => setState(() => online = true));
     }
+    final allItems = ordered(manga);
+    final favoriteItems = ordered(manga.where((item) => item.favorite).toList());
     return switch (page) {
       Page.latest => Collection(
-          items: ordered(manga),
+          items: filtered(allItems),
           onTap: (item) => setState(() => selected = item),
           compact: compact,
           header: 'آخر التحديثات',
-          helper: 'قصص جديدة ومختارة لتبدأ بها اليوم',
-          featured: true,
+          helper: '',
+          featured: !searching && searchQuery.isEmpty,
         ),
       Page.manga => Collection(
-          items: ordered(manga),
+          items: filtered(allItems),
           onTap: (item) => setState(() => selected = item),
           compact: compact,
           header: 'كل المانجا',
-          helper: 'تصفح العناوين حسب مزاجك واكتشف عالمًا جديدًا',
+          helper: '',
         ),
       Page.favorites => Collection(
-          items: ordered(manga.where((item) => item.favorite).toList()),
+          items: filtered(favoriteItems),
           onTap: (item) => setState(() => selected = item),
           compact: compact,
-          header: 'المفضلة لديك',
-          helper: 'احتفظ بالقصص التي تريد العودة إليها لاحقًا',
+          header: 'المفضلة',
+          helper: '',
         ),
       Page.storage => storage(),
       Page.notifications => notices(),
@@ -680,44 +662,13 @@ class _ShellState extends State<Shell> {
                             fontSize: 17,
                           ),
                         ),
-                        SizedBox(height: 5),
-                        Text(
-                          'عالمك القصصي بين يديك',
-                          style: TextStyle(color: muted, fontSize: 11),
-                        ),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 18),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [accent.withOpacity(.18), teal.withOpacity(.08)],
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                ),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: accent.withOpacity(.16)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.auto_awesome_rounded, color: teal, size: 21),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'اكتشف فصلًا جديدًا اليوم',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  Icon(Icons.chevron_left_rounded, color: accent.withOpacity(.8)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 12),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -726,14 +677,10 @@ class _ShellState extends State<Shell> {
                   nav('الأحدث', Icons.auto_awesome_rounded, Page.latest),
                   nav('استكشف المانجا', Icons.menu_book_rounded, Page.manga),
                   nav('المفضلة', Icons.favorite_border_rounded, Page.favorites),
+                  nav('التحميلات', Icons.downloading_rounded, Page.notifications),
                   nav('التخزين', Icons.download_outlined, Page.storage),
                   const SizedBox(height: 18),
                   _drawerLabel('التطبيق'),
-                  nav(
-                    'النشاط والتنزيلات',
-                    Icons.notifications_none_rounded,
-                    Page.notifications,
-                  ),
                   nav('الإعدادات', Icons.settings_outlined, Page.settings),
                   nav('حول التطبيق', Icons.info_outline_rounded, Page.about),
                 ],
@@ -750,11 +697,6 @@ class _ShellState extends State<Shell> {
                       color: teal,
                       shape: BoxShape.circle,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'متصل الآن',
-                    style: TextStyle(color: muted, fontSize: 11),
                   ),
                   const Spacer(),
                   const Text(
@@ -847,8 +789,7 @@ class _ShellState extends State<Shell> {
     if (saved.isEmpty) {
       return const EmptyState(
         icon: Icons.download_done_rounded,
-        title: 'مساحتك الهادئة للقراءة',
-        description: 'نزّل فصولك المفضلة لتظهر هنا وتقرأها بلا اتصال.',
+        title: 'لا توجد فصول محفوظة',
       );
     }
     return CustomScrollView(
@@ -891,16 +832,23 @@ class _ShellState extends State<Shell> {
   Widget notices() {
     if (tasks.isEmpty) {
       return const EmptyState(
-        icon: Icons.notifications_none_rounded,
-        title: 'لا يوجد نشاط بعد',
-        description: 'ابدأ بقراءة فصل أو تنزيله وستظهر تحديثاتك هنا.',
+        icon: Icons.downloading_rounded,
+        title: 'لا توجد تحميلات',
+        description: '',
       );
     }
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
       children: [
-        _ActivityHeader(count: tasks.length),
-        const SizedBox(height: 22),
+        Row(
+          children: [
+            const Expanded(
+              child: Text('التحميلات', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+            ),
+            Text('${tasks.length}', style: const TextStyle(color: accent, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        const SizedBox(height: 16),
         ...tasks.map((task) => DownloadTaskCard(task: task)),
       ],
     );
@@ -908,67 +856,72 @@ class _ShellState extends State<Shell> {
 
   Widget settings() {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
       children: [
-        _SettingsProfile(),
-        const SizedBox(height: 26),
-        const SectionHeading(
-          title: 'تجربة القراءة',
-          helper: 'اجعل التطبيق يناسب طريقتك في القراءة.',
-        ),
-        setting(
-          'إشعارات التحديثات',
-          'تنبيهات عند صدور فصول جديدة',
-          notifications,
-          (value) => setState(() => notifications = value),
-          Icons.notifications_active_outlined,
-        ),
-        setting(
-          'التنزيل عبر Wi‑Fi فقط',
-          'تقليل استهلاك بيانات الهاتف',
-          wifiOnly,
-          (value) => setState(() => wifiOnly = value),
-          Icons.wifi_rounded,
-        ),
-        setting(
-          'عرض مضغوط',
-          'تقليل المسافات بين البطاقات',
-          compact,
-          (value) => setState(() => compact = value),
-          Icons.view_agenda_outlined,
-        ),
-        const SizedBox(height: 24),
-        const SectionHeading(
-          title: 'الحساب والاتصال',
-          helper: 'معلومات أساسية عن جلسة التطبيق.',
-        ),
-        setting(
-          'الاتصال بالإنترنت',
-          online ? 'متصل وجاهز للتحديث' : 'متوقف مؤقتًا',
-          online,
-          (value) => setState(() => online = value),
-          online ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
-        ),
-        Card(
-          color: surface,
-          margin: const EdgeInsets.only(bottom: 10),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(color: Colors.white.withOpacity(.05)),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-            leading: const Icon(Icons.login_rounded, color: accent),
-            title: const Text('تسجيل الدخول'),
-            subtitle: const Text(
-              'زامن مكتبتك على أجهزتك',
-              style: TextStyle(color: muted, fontSize: 11),
-            ),
-            trailing: const Icon(Icons.chevron_left_rounded, color: muted),
-            onTap: () {},
-          ),
-        ),
+        const _SettingsHeading(title: 'الحساب والمزامنة'),
+        _simpleSetting('تسجيل الدخول', Icons.login_rounded, onTap: () {}),
+        const SizedBox(height: 22),
+        const _SettingsHeading(title: 'الثيم والظهور'),
+        _simpleSetting('اللغة', Icons.language_rounded, value: 'العربية'),
+        setting('الوضع الداكن', '', appDarkMode.value, (value) {
+          setState(() => appDarkMode.value = value);
+        }, Icons.dark_mode_outlined),
+        const SizedBox(height: 7),
+        const Text('الثيم', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+        const SizedBox(height: 10),
+        _themePicker(),
+        const SizedBox(height: 22),
+        const _SettingsHeading(title: 'القارئ'),
+        setting('عرض مضغوط', '', compact, (value) => setState(() => compact = value), Icons.view_agenda_outlined),
+        const SizedBox(height: 22),
+        const _SettingsHeading(title: 'التنزيلات'),
+        setting('التنزيل عبر Wi‑Fi فقط', '', wifiOnly, (value) => setState(() => wifiOnly = value), Icons.wifi_rounded),
+        setting('الاتصال بالإنترنت', '', online, (value) => setState(() => online = value), Icons.cloud_done_outlined),
       ],
+    );
+  }
+
+  Widget _simpleSetting(String title, IconData icon, {String? value, VoidCallback? onTap}) {
+    return Card(
+      color: surface,
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+        leading: Icon(icon, color: accent),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        trailing: value == null
+            ? const Icon(Icons.chevron_left_rounded, color: muted)
+            : Text(value, style: const TextStyle(color: muted, fontSize: 11)),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _themePicker() {
+    final options = <Color>[accent, const Color(0xFFFF6B78), const Color(0xFF56D596), const Color(0xFF6FD5FF)];
+    return Row(
+      children: options.map((color) {
+        final selected = themeColor.value == color.value;
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsetsDirectional.only(end: 8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => setState(() => themeColor = color),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(.18),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: selected ? color : Colors.transparent, width: 2),
+                ),
+                child: Icon(selected ? Icons.check_rounded : Icons.circle, color: color, size: selected ? 20 : 14),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -993,7 +946,6 @@ class _ShellState extends State<Shell> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         secondary: Icon(icon, color: accent),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text(helper, style: const TextStyle(color: muted, fontSize: 11)),
       ),
     );
   }
@@ -1026,11 +978,6 @@ class _ShellState extends State<Shell> {
                 ),
               ),
               const SizedBox(height: 7),
-              const Text(
-                'اقرأ أكثر، انتظر أقل، واستمتع بكل صفحة.',
-                style: TextStyle(color: muted, fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
               const SizedBox(height: 17),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -1047,10 +994,7 @@ class _ShellState extends State<Shell> {
           ),
         ),
         const SizedBox(height: 28),
-        const SectionHeading(
-          title: 'عن التطبيق',
-          helper: 'تفاصيل صغيرة تصنع تجربة قراءة أفضل.',
-        ),
+        const SectionHeading(title: 'عن التطبيق', helper: ''),
         info(Icons.language_rounded, 'اللغة', 'العربية'),
         info(Icons.devices_rounded, 'مصمم لـ', 'هواتف وأجهزة أندرويد'),
         info(Icons.auto_awesome_rounded, 'الهدف', 'قراءة هادئة بلا تشتيت'),
@@ -1111,16 +1055,7 @@ class Collection extends StatelessWidget {
               child: FeaturedBanner(item: items.first, onTap: () => onTap(items.first)),
             ),
           ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(20, featured ? 2 : 14, 20, 16),
-            child: SectionHeading(
-              title: header,
-              helper: helper,
-              trailing: '${items.length} عناوين',
-            ),
-          ),
-        ),
+        SliverToBoxAdapter(child: SizedBox(height: featured ? 0 : 14)),
         SliverPadding(
           padding: EdgeInsets.fromLTRB(18, 0, 18, compact ? 16 : 30),
           sliver: SliverGrid(
@@ -1160,22 +1095,11 @@ class SectionHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                helper,
-                style: const TextStyle(color: muted, fontSize: 11, height: 1.45),
-              ),
-            ],
+          child: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
           ),
         ),
         if (trailing != null)
@@ -1196,86 +1120,68 @@ class FeaturedBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: .96, end: 1),
-      duration: const Duration(milliseconds: 540),
-      curve: Curves.easeOutCubic,
-      builder: (_, value, child) => Transform.scale(scale: value, child: child),
-      child: Material(
-        color: surface,
-        borderRadius: BorderRadius.circular(26),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: SizedBox(
-            height: 210,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(item.asset, fit: BoxFit.cover),
-                DecoratedBox(
+    return Material(
+      color: surface,
+      borderRadius: BorderRadius.circular(26),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 210,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(item.asset, fit: BoxFit.cover),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.transparent, navy.withOpacity(.96)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [.18, 1],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.transparent, navy.withOpacity(.96)],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      stops: const [.18, 1],
-                    ),
+                    color: teal.withOpacity(.16),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: teal.withOpacity(.26)),
+                  ),
+                  child: const Text(
+                    'اختيار اليوم',
+                    style: TextStyle(color: teal, fontSize: 10, fontWeight: FontWeight.w800),
                   ),
                 ),
-                Positioned(
-                  top: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: teal.withOpacity(.16),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: teal.withOpacity(.26)),
-                    ),
-                    child: const Text(
-                      'اختيار اليوم',
-                      style: TextStyle(color: teal, fontSize: 10, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 18,
-                  left: 18,
-                  bottom: 16,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.title,
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item.description,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.5),
-                            ),
-                          ],
-                        ),
+              ),
+              Positioned(
+                right: 18,
+                left: 18,
+                bottom: 16,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
                       ),
-                      const SizedBox(width: 14),
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: const BoxDecoration(color: accent, shape: BoxShape.circle),
-                        child: const Icon(Icons.arrow_back_rounded, color: navy),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 14),
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: const BoxDecoration(color: accent, shape: BoxShape.circle),
+                      child: const Icon(Icons.arrow_back_rounded, color: navy),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1292,55 +1198,44 @@ class CardManga extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: 360 + (index * 45)),
-      curve: Curves.easeOutCubic,
-      builder: (_, value, child) => Opacity(
-        opacity: value,
-        child: Transform.translate(offset: Offset(0, 18 * (1 - value)), child: child),
-      ),
-      child: Material(
-        color: Colors.transparent,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: tap,
         borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: tap,
-          borderRadius: BorderRadius.circular(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _CoverFrame(item: item, hero: true),
-              ),
-              const SizedBox(height: 9),
-              Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(Icons.star_rounded, color: Color(0xFFFFC857), size: 13),
-                  const SizedBox(width: 3),
-                  Text(
-                    item.rating.toStringAsFixed(1),
-                    style: const TextStyle(color: inkText, fontSize: 10, fontWeight: FontWeight.w700),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _CoverFrame(item: item, hero: true)),
+            const SizedBox(height: 9),
+            Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.star_rounded, color: Color(0xFFFFC857), size: 13),
+                const SizedBox(width: 3),
+                Text(
+                  item.rating.toStringAsFixed(1),
+                  style: const TextStyle(color: inkText, fontSize: 10, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    '${item.chapters} فصل',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: muted, fontSize: 10),
                   ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      '${item.chapters} فصل',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: muted, fontSize: 10),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -1909,8 +1804,7 @@ class ChapterTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
             child: Row(
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
+                Container(
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
@@ -1941,7 +1835,7 @@ class ChapterTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        record?.read == true ? 'مقروء · اضغط لإعادة الفتح' : 'جاهز للقراءة · اضغط مطولًا للتحديد',
+                        record?.read == true ? 'مقروء' : 'غير مقروء',
                         style: const TextStyle(color: muted, fontSize: 10),
                       ),
                     ],
@@ -2053,7 +1947,7 @@ class DownloadTaskCard extends StatelessWidget {
             const SizedBox(height: 7),
             Row(
               children: [
-                const Text('جارٍ الحفظ على جهازك', style: TextStyle(color: muted, fontSize: 10)),
+                const Text('جاري التنزيل', style: TextStyle(color: muted, fontSize: 10)),
                 const Spacer(),
                 Text('${(task.progress * 100).round()}%', style: const TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.w800)),
               ],
@@ -2064,7 +1958,7 @@ class DownloadTaskCard extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: Padding(
                 padding: EdgeInsets.only(top: 10),
-                child: Text('فشل التنزيل · حاول مرة أخرى', style: TextStyle(color: danger, fontSize: 10)),
+                child: Text('فشل التنزيل', style: TextStyle(color: danger, fontSize: 10)),
               ),
             ),
           if (success)
@@ -2072,7 +1966,7 @@ class DownloadTaskCard extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: Padding(
                 padding: EdgeInsets.only(top: 10),
-                child: Text('تم الحفظ · متاح بلا اتصال', style: TextStyle(color: teal, fontSize: 10)),
+                child: Text('تم التنزيل', style: TextStyle(color: teal, fontSize: 10)),
               ),
             ),
         ],
@@ -2105,14 +1999,7 @@ class _StorageSummary extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('جاهز للقراءة بلا اتصال', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                SizedBox(height: 4),
-                Text('كل ما حفظته مؤمن في مكتبتك المحلية.', style: TextStyle(color: muted, fontSize: 10)),
-              ],
-            ),
+            child: Text('القراءة دون اتصال', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
           ),
           Text('$count أعمال', style: const TextStyle(color: teal, fontWeight: FontWeight.w800, fontSize: 11)),
         ],
@@ -2153,6 +2040,20 @@ class _ActivityHeader extends StatelessWidget {
   }
 }
 
+class _SettingsHeading extends StatelessWidget {
+  final String title;
+
+  const _SettingsHeading({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 11),
+      child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+    );
+  }
+}
+
 class _SettingsProfile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -2188,87 +2089,6 @@ class _SettingsProfile extends StatelessWidget {
           const Icon(Icons.edit_outlined, color: muted, size: 19),
         ],
       ),
-    );
-  }
-}
-
-class SearchManga extends SearchDelegate<MangaItem?> {
-  final ValueChanged<MangaItem> open;
-
-  SearchManga(this.open);
-
-  @override
-  ThemeData appBarTheme(BuildContext context) {
-    return Theme.of(context).copyWith(
-      appBarTheme: const AppBarTheme(backgroundColor: surface, foregroundColor: inkText),
-      inputDecorationTheme: const InputDecorationTheme(border: InputBorder.none),
-    );
-  }
-
-  @override
-  List<Widget>? buildActions(BuildContext context) {
-    return [
-      if (query.isNotEmpty)
-        IconButton(onPressed: () => query = '', icon: const Icon(Icons.clear_rounded)),
-    ];
-  }
-
-  @override
-  Widget? buildLeading(BuildContext context) {
-    return IconButton(
-      onPressed: () => close(context, null),
-      icon: const Icon(Icons.arrow_forward_rounded),
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) => results(context);
-
-  @override
-  Widget buildSuggestions(BuildContext context) => results(context);
-
-  Widget results(BuildContext context) {
-    final found = manga
-        .where(
-          (item) => item.title.contains(query) || item.subtitle.toLowerCase().contains(query.toLowerCase()),
-        )
-        .toList();
-    if (found.isEmpty) {
-      return const EmptyState(
-        icon: Icons.search_off_rounded,
-        title: 'لا توجد نتائج مطابقة',
-        description: 'جرّب اسمًا مختلفًا أو ابحث بالعنوان الإنجليزي.',
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-      itemCount: found.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 9),
-      itemBuilder: (_, index) {
-        final item = found[index];
-        return Material(
-          color: surface,
-          borderRadius: BorderRadius.circular(17),
-          child: ListTile(
-            onTap: () {
-              close(context, item);
-              open(item);
-            },
-            contentPadding: const EdgeInsets.all(9),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.asset(item.asset, width: 48, height: 62, fit: BoxFit.cover),
-            ),
-            title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Text('${item.subtitle}  ·  ${item.chapters} فصل', style: const TextStyle(color: muted, fontSize: 10)),
-            ),
-            trailing: const Icon(Icons.chevron_left_rounded, color: muted),
-          ),
-        );
-      },
     );
   }
 }
