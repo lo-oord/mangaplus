@@ -971,7 +971,7 @@ class _ShellState extends State<Shell> {
               maxCrossAxisExtent: 182,
               mainAxisSpacing: 17,
               crossAxisSpacing: 14,
-              childAspectRatio: .62,
+              childAspectRatio: .65,
             ),
           ),
         ),
@@ -999,9 +999,26 @@ class _ShellState extends State<Shell> {
           ],
         ),
         const SizedBox(height: 16),
-        ...tasks.map((task) => DownloadTaskCard(task: task)),
+        ...tasks.map(
+          (task) => DownloadTaskCard(
+            task: task,
+            onRetry: task.status == DownloadStatus.failed ? () => retryDownload(task) : null,
+          ),
+        ),
       ],
     );
+  }
+
+  void retryDownload(DownloadTask task) {
+    if (task.status != DownloadStatus.failed) return;
+    setState(() {
+      task.status = DownloadStatus.downloading;
+      task.progress = 0;
+      for (final number in task.chapters) {
+        recordFor(task.item, number).download = DownloadStatus.downloading;
+      }
+    });
+    _downloadTask(task, task.item, task.chapters);
   }
 
   Widget settings() {
@@ -2125,8 +2142,9 @@ class StorageCard extends StatelessWidget {
 
 class DownloadTaskCard extends StatelessWidget {
   final DownloadTask task;
+  final VoidCallback? onRetry;
 
-  const DownloadTaskCard({super.key, required this.task});
+  const DownloadTaskCard({super.key, required this.task, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -2190,12 +2208,18 @@ class DownloadTaskCard extends StatelessWidget {
             ),
           ],
           if (failed)
-            const Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: Text('فشل التنزيل', style: TextStyle(color: danger, fontSize: 10)),
-              ),
+            Row(
+              children: [
+                const Text('فشل التنزيل', style: TextStyle(color: danger, fontSize: 10)),
+                const Spacer(),
+                if (onRetry != null)
+                  TextButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text('إعادة المحاولة'),
+                    style: TextButton.styleFrom(foregroundColor: accent, visualDensity: VisualDensity.compact),
+                  ),
+              ],
             ),
           if (success)
             const Align(
