@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 const navy = Color(0xFF121923),
@@ -69,6 +70,25 @@ final manga = <MangaItem>[
 ];
 
 enum Page { latest, manga, favorites, storage, notifications, settings, about }
+
+enum DownloadStatus { idle, queued, downloading, success, failed }
+
+class ChapterRecord {
+  DownloadStatus download = DownloadStatus.idle;
+  bool read = false;
+}
+
+class DownloadTask {
+  final MangaItem item;
+  final List<int> chapters;
+  DownloadStatus status = DownloadStatus.queued;
+  double progress = 0;
+  Timer? timer;
+  DownloadTask(this.item, this.chapters);
+  bool get done =>
+      status == DownloadStatus.success || status == DownloadStatus.failed;
+  String get label => '${chapters.length} فصل من ${item.title}';
+}
 
 class EmptyState extends StatelessWidget {
   final IconData icon;
@@ -170,6 +190,57 @@ class _ShellState extends State<Shell> {
   Page page = Page.latest;
   MangaItem? selected;
   bool compact = false, notifications = true, wifiOnly = false, online = true;
+  final Map<String, Map<int, ChapterRecord>> records = {};
+  final List<DownloadTask> tasks = [];
+  Map<int, ChapterRecord> recordsFor(MangaItem item) =>
+      records.putIfAbsent(item.title, () => {});
+  ChapterRecord recordFor(MangaItem item, int number) =>
+      recordsFor(item).putIfAbsent(number, ChapterRecord.new);
+  List<int> downloadedFor(MangaItem item) => recordsFor(item)
+      .entries
+      .where((e) => e.value.download == DownloadStatus.success)
+      .map((e) => e.key)
+      .toList()
+    ..sort((a, b) => b.compareTo(a));
+  void enqueueDownload(MangaItem item, List<int> numbers) {
+    final chapters = numbers.toSet().toList()..sort((a, b) => b.compareTo(a));
+    if (chapters.isEmpty) return;
+    if (!online) {
+      setState(() {
+        for (final n in chapters)
+          recordFor(item, n).download = DownloadStatus.failed;
+        tasks.insert(
+            0, DownloadTask(item, chapters)..status = DownloadStatus.failed);
+      });
+      return;
+    }
+    final task = DownloadTask(item, chapters);
+    setState(() {
+      tasks.insert(0, task);
+      for (final n in chapters)
+        recordFor(item, n).download = DownloadStatus.downloading;
+      task.status = DownloadStatus.downloading;
+    });
+    task.timer = Timer.periodic(const Duration(milliseconds: 180), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        task.progress = (task.progress + .12).clamp(0, 1);
+        if (task.progress >= 1) {
+          task.status = DownloadStatus.success;
+          for (final n in chapters)
+            recordFor(item, n).download = DownloadStatus.success;
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  void setRead(MangaItem item, List<int> numbers, bool value) => setState(() {
+        for (final n in numbers) recordFor(item, n).read = value;
+      });
   String get title =>
       selected?.title ??
       switch (page) {
@@ -212,8 +283,13 @@ class _ShellState extends State<Shell> {
           child: selected != null
               ? Details(
                   item: selected!,
+                  records: recordsFor(selected!),
+                  downloadedOnly: page == Page.storage,
                   back: () => setState(() => selected = null),
-                  changed: () => setState(() {}))
+                  changed: () => setState(() {}),
+                  onDownload: (numbers) => enqueueDownload(selected!, numbers),
+                  onRead: (numbers, value) =>
+                      setRead(selected!, numbers, value))
               : body()));
   Widget body() => !online
       ? OfflineState(onRetry: () => setState(() => online = true))
@@ -286,48 +362,53 @@ class _ShellState extends State<Shell> {
         });
   }
 
-  Widget storage() =>
-      ListView(padding: const EdgeInsets.fromLTRB(18, 8, 18, 28), children: [
-        section('المساحة المستخدمة'),
-        Card(
-            color: surface,
-            child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(children: [
-                  Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('الفصول المحفوظة'),
-                        Text('0 فصل',
-                            style: const TextStyle(
-                                color: accent, fontWeight: FontWeight.bold))
-                      ]),
-                  const SizedBox(height: 16),
-                  const ClipRRect(
-                      borderRadius: BorderRadius.all(Radius.circular(8)),
-                      child: LinearProgressIndicator(
-                          value: .02,
-                          minHeight: 8,
-                          backgroundColor: surface2,
-                          color: accent)),
-                  const SizedBox(height: 12),
-                  const Align(
-                      alignment: Alignment.centerRight,
-                      child:
-                          Text('0 MB من 2 GB', style: TextStyle(color: muted)))
-                ]))),
-        const SizedBox(height: 22),
-        section('التنزيلات'),
-        empty(Icons.download_done_rounded, 'لا توجد فصول محفوظة')
-      ]);
-  Widget notices() =>
-      ListView(padding: const EdgeInsets.fromLTRB(18, 8, 18, 28), children: [
-        section('اليوم'),
-        notice('تحديث جديد', 'تمت إضافة فصول جديدة إلى ظل التنين',
-            Icons.auto_awesome_rounded),
-        notice('مرحبًا بك', 'ابدأ بإضافة المانجا إلى المفضلة',
-            Icons.favorite_rounded)
-      ]);
+  Widget storage() {
+    final saved =
+        manga.where((item) => downloadedFor(item).isNotEmpty).toList();
+    if (saved.isEmpty)
+      return const EmptyState(
+          icon: Icons.download_done_rounded, title: 'لا توجد تنزيلات');
+    return CustomScrollView(slivers: [
+      SliverToBoxAdapter(
+          child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+              child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('التخزين المحلي',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text('${saved.length} أعمال',
+                        style: const TextStyle(color: muted))
+                  ]))),
+      SliverPadding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+          sliver: SliverGrid(
+              delegate: SliverChildBuilderDelegate((context, i) {
+                final item = saved[i];
+                return StorageCard(
+                    item: item,
+                    count: downloadedFor(item).length,
+                    onTap: () => setState(() {
+                          selected = item;
+                          page = Page.storage;
+                        }));
+              }, childCount: saved.length),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 14,
+                  crossAxisSpacing: 14,
+                  childAspectRatio: .61)))
+    ]);
+  }
+
+  Widget notices() => tasks.isEmpty
+      ? const EmptyState(
+          icon: Icons.notifications_none_rounded, title: 'لا توجد تنزيلات')
+      : ListView(padding: const EdgeInsets.fromLTRB(18, 8, 18, 28), children: [
+          section('التنزيلات'),
+          ...tasks.map((task) => DownloadTaskCard(task: task))
+        ]);
   Widget settings() =>
       ListView(padding: const EdgeInsets.fromLTRB(18, 8, 18, 28), children: [
         section('التفضيلات'),
@@ -485,14 +566,29 @@ class CardManga extends StatelessWidget {
       ]));
 }
 
-class Details extends StatelessWidget {
+class Details extends StatefulWidget {
   final MangaItem item;
   final VoidCallback back, changed;
+  final Map<int, ChapterRecord> records;
+  final bool downloadedOnly;
+  final ValueChanged<List<int>> onDownload;
+  final void Function(List<int>, bool) onRead;
   const Details(
       {super.key,
       required this.item,
       required this.back,
-      required this.changed});
+      required this.changed,
+      required this.records,
+      required this.downloadedOnly,
+      required this.onDownload,
+      required this.onRead});
+  @override
+  State<Details> createState() => _DetailsState();
+}
+
+class _DetailsState extends State<Details> {
+  final Set<int> selected = {};
+  bool selecting = false;
   @override
   Widget build(BuildContext c) => CustomScrollView(slivers: [
         SliverToBoxAdapter(
@@ -500,7 +596,7 @@ class Details extends StatelessWidget {
           SizedBox(
               height: 300,
               width: double.infinity,
-              child: Image.asset(item.asset, fit: BoxFit.cover)),
+              child: Image.asset(widget.item.asset, fit: BoxFit.cover)),
           Positioned.fill(
               child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -512,7 +608,7 @@ class Details extends StatelessWidget {
               top: 12,
               right: 12,
               child: IconButton.filledTonal(
-                  onPressed: back,
+                  onPressed: widget.back,
                   icon: const Icon(Icons.arrow_forward_rounded))),
           Positioned(
               bottom: 22,
@@ -521,21 +617,22 @@ class Details extends StatelessWidget {
               child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.asset(item.asset,
+                    child: Image.asset(widget.item.asset,
                         width: 92, height: 132, fit: BoxFit.cover)),
                 const SizedBox(width: 14),
                 Expanded(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text(item.title,
+                      Text(widget.item.title,
                           style: const TextStyle(
                               fontSize: 24, fontWeight: FontWeight.w800)),
-                      Text(item.subtitle, style: const TextStyle(color: muted)),
+                      Text(widget.item.subtitle,
+                          style: const TextStyle(color: muted)),
                       const SizedBox(height: 8),
                       Wrap(
                           spacing: 6,
-                          children: item.tags
+                          children: widget.item.tags
                               .map((x) => Chip(
                                   label: Text(x,
                                       style: const TextStyle(fontSize: 11)),
@@ -561,21 +658,23 @@ class Details extends StatelessWidget {
                     const SizedBox(width: 10),
                     IconButton.filledTonal(
                         onPressed: () {
-                          item.favorite = !item.favorite;
-                          changed();
+                          widget.item.favorite = !widget.item.favorite;
+                          widget.changed();
                         },
                         icon: Icon(
-                            item.favorite
+                            widget.item.favorite
                                 ? Icons.favorite_rounded
                                 : Icons.favorite_border_rounded,
-                            color: item.favorite ? Colors.redAccent : null)),
+                            color: widget.item.favorite
+                                ? Colors.redAccent
+                                : null)),
                   ]),
                   const SizedBox(height: 24),
                   const Text('نبذة',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Text(item.description,
+                  Text(widget.item.description,
                       style: const TextStyle(color: muted, height: 1.7)),
                   const SizedBox(height: 24),
                   Row(
@@ -584,41 +683,256 @@ class Details extends StatelessWidget {
                         const Text('الفصول',
                             style: TextStyle(
                                 fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text('${item.chapters} فصل',
+                        Text('${widget.item.chapters} فصل',
                             style: const TextStyle(color: accent))
                       ]),
                   const SizedBox(height: 10),
-                  ...List.generate(
-                      8, (i) => ChapterTile(number: item.chapters - i)),
+                  if (selecting)
+                    SelectionBar(
+                        selected: selected,
+                        total: widget.item.chapters,
+                        onAll: () => setState(() => selected.addAll(
+                            List.generate(widget.item.chapters,
+                                (i) => widget.item.chapters - i))),
+                        onDownload: () {
+                          widget.onDownload(selected.toList());
+                          setState(() {
+                            selected.clear();
+                            selecting = false;
+                          });
+                        },
+                        onRead: (value) {
+                          widget.onRead(selected.toList(), value);
+                          setState(() {
+                            selected.clear();
+                            selecting = false;
+                          });
+                        }),
+                  ...List.generate(8, (i) => widget.item.chapters - i)
+                      .where((n) =>
+                          !widget.downloadedOnly ||
+                          widget.records[n]?.download == DownloadStatus.success)
+                      .map((n) => ChapterTile(
+                          number: n,
+                          record: widget.records[n],
+                          selected: selected.contains(n),
+                          onLongPress: () => setState(() {
+                                selecting = true;
+                                selected.add(n);
+                              }),
+                          onTap: () {
+                            if (selecting)
+                              setState(() {
+                                selected.contains(n)
+                                    ? selected.remove(n)
+                                    : selected.add(n);
+                                if (selected.isEmpty) selecting = false;
+                              });
+                            else {
+                              widget.records
+                                  .putIfAbsent(n, ChapterRecord.new)
+                                  .read = true;
+                              widget.changed();
+                            }
+                          })),
                 ]))),
       ]);
 }
 
-class ChapterTile extends StatefulWidget {
-  final int number;
-  const ChapterTile({super.key, required this.number});
-  @override
-  State<ChapterTile> createState() => _ChapterTileState();
-}
-
-class _ChapterTileState extends State<ChapterTile> {
-  bool downloaded = false;
+class SelectionBar extends StatelessWidget {
+  final Set<int> selected;
+  final int total;
+  final VoidCallback onAll, onDownload;
+  final ValueChanged<bool> onRead;
+  const SelectionBar(
+      {super.key,
+      required this.selected,
+      required this.total,
+      required this.onAll,
+      required this.onDownload,
+      required this.onRead});
   @override
   Widget build(BuildContext context) => Card(
-      color: surface,
-      child: ListTile(
-          onTap: () => setState(() => downloaded = !downloaded),
-          leading: CircleAvatar(
-              backgroundColor: accent.withOpacity(.14),
-              child: Text('${widget.number}',
-                  style: const TextStyle(color: accent, fontSize: 12))),
-          title: Text('الفصل ${widget.number}'),
-          subtitle: const Text('منذ يومين', style: TextStyle(color: muted)),
-          trailing: Icon(
-              downloaded
-                  ? Icons.download_done_rounded
-                  : Icons.download_outlined,
-              color: downloaded ? accent : muted)));
+      color: surface2,
+      child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('${selected.length} محدد'),
+                TextButton(onPressed: onAll, child: const Text('تحديد الكل')),
+                IconButton(
+                    onPressed: onDownload,
+                    icon: const Icon(Icons.download_rounded)),
+                IconButton(
+                    onPressed: () => onRead(true),
+                    icon: const Icon(Icons.done_all_rounded)),
+                IconButton(
+                    onPressed: () => onRead(false),
+                    icon: const Icon(Icons.mark_email_unread_outlined))
+              ])));
+}
+
+class ChapterTile extends StatelessWidget {
+  final int number;
+  final ChapterRecord? record;
+  final bool selected;
+  final VoidCallback onLongPress, onTap;
+  const ChapterTile(
+      {super.key,
+      required this.number,
+      this.record,
+      required this.selected,
+      required this.onLongPress,
+      required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final status = record?.download ?? DownloadStatus.idle;
+    final icon = status == DownloadStatus.success
+        ? Icons.download_done_rounded
+        : status == DownloadStatus.failed
+            ? Icons.error_outline_rounded
+            : status == DownloadStatus.downloading
+                ? Icons.downloading_rounded
+                : Icons.download_outlined;
+    return Card(
+        color: selected ? accent.withOpacity(.18) : surface,
+        child: ListTile(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            leading: CircleAvatar(
+                backgroundColor: accent.withOpacity(.14),
+                child: Text('$number',
+                    style: const TextStyle(color: accent, fontSize: 12))),
+            title: Text('الفصل $number',
+                style: TextStyle(
+                    fontWeight: record?.read == true
+                        ? FontWeight.normal
+                        : FontWeight.bold)),
+            subtitle: Text(record?.read == true ? 'مقروء' : 'غير مقروء',
+                style: const TextStyle(color: muted)),
+            trailing: status == DownloadStatus.downloading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: accent))
+                : Icon(icon,
+                    color: status == DownloadStatus.failed
+                        ? Colors.redAccent
+                        : status == DownloadStatus.success
+                            ? accent
+                            : muted)));
+  }
+}
+
+class StorageCard extends StatelessWidget {
+  final MangaItem item;
+  final int count;
+  final VoidCallback onTap;
+  const StorageCard(
+      {super.key,
+      required this.item,
+      required this.count,
+      required this.onTap});
+  @override
+  Widget build(BuildContext context) => InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(
+            child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(fit: StackFit.expand, children: [
+                  Image.asset(item.asset, fit: BoxFit.cover),
+                  Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(8)),
+                          child: Text('$count فصل',
+                              style: const TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.bold))))
+                ]))),
+        const SizedBox(height: 8),
+        Text(item.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 3),
+        const Text('متاح بدون إنترنت',
+            style: TextStyle(color: muted, fontSize: 11))
+      ]));
+}
+
+class DownloadTaskCard extends StatelessWidget {
+  final DownloadTask task;
+  const DownloadTaskCard({super.key, required this.task});
+  @override
+  Widget build(BuildContext context) {
+    final failed = task.status == DownloadStatus.failed,
+        success = task.status == DownloadStatus.success;
+    return Card(
+        color: surface,
+        margin: const EdgeInsets.only(bottom: 10),
+        child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(children: [
+              Row(children: [
+                Image.asset(task.item.asset,
+                    width: 44, height: 58, fit: BoxFit.cover),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(task.item.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(task.label,
+                          style: const TextStyle(color: muted, fontSize: 12))
+                    ])),
+                Icon(
+                    failed
+                        ? Icons.error_outline_rounded
+                        : success
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.downloading_rounded,
+                    color: failed
+                        ? Colors.redAccent
+                        : success
+                            ? accent
+                            : muted)
+              ]),
+              if (!success && !failed) ...[
+                const SizedBox(height: 12),
+                LinearProgressIndicator(
+                    value: task.progress,
+                    color: accent,
+                    backgroundColor: surface2),
+                const SizedBox(height: 6),
+                Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('${(task.progress * 100).round()}%',
+                        style: const TextStyle(color: muted, fontSize: 11)))
+              ],
+              if (failed)
+                const Align(
+                    alignment: Alignment.centerRight,
+                    child: Text('فشل التنزيل',
+                        style:
+                            TextStyle(color: Colors.redAccent, fontSize: 12))),
+              if (success)
+                const Align(
+                    alignment: Alignment.centerRight,
+                    child: Text('تم التنزيل',
+                        style: TextStyle(color: accent, fontSize: 12)))
+            ])));
+  }
 }
 
 class SearchManga extends SearchDelegate<MangaItem?> {
