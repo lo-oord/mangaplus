@@ -446,10 +446,10 @@ class _ShellState extends State<Shell> {
                         }));
               }, childCount: saved.length),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
+                  crossAxisCount: 3,
                   mainAxisSpacing: 14,
                   crossAxisSpacing: 14,
-                  childAspectRatio: .61)))
+                  childAspectRatio: .58)))
     ]);
   }
 
@@ -570,10 +570,10 @@ class Collection extends StatelessWidget {
                           CardManga(item: items[i], tap: () => onTap(items[i])),
                       childCount: items.length),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
+                      crossAxisCount: 3,
                       mainAxisSpacing: 14,
                       crossAxisSpacing: 14,
-                      childAspectRatio: .61)))
+                      childAspectRatio: .58)))
         ]);
 }
 
