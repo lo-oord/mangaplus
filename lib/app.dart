@@ -189,7 +189,11 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   Page page = Page.latest;
   MangaItem? selected;
-  bool compact = false, notifications = true, wifiOnly = false, online = true;
+  bool compact = false,
+      notifications = true,
+      wifiOnly = false,
+      online = true,
+      chaptersDescending = true;
   final Map<String, Map<int, ChapterRecord>> records = {};
   final List<DownloadTask> tasks = [];
   Map<int, ChapterRecord> recordsFor(MangaItem item) =>
@@ -252,6 +256,47 @@ class _ShellState extends State<Shell> {
         Page.settings => 'الإعدادات',
         Page.about => 'حول'
       };
+  List<MangaItem> ordered(List<MangaItem> items) {
+    final result = [...items];
+    result.sort((a, b) => chaptersDescending
+        ? b.chapters.compareTo(a.chapters)
+        : a.chapters.compareTo(b.chapters));
+    return result;
+  }
+
+  void showSortMenu() => showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Padding(
+                padding: EdgeInsets.all(18),
+                child: Text('ترتيب المانجا',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 17))),
+            ListTile(
+                leading: const Icon(Icons.new_releases_outlined, color: accent),
+                title: const Text('الأحدث'),
+                trailing: chaptersDescending
+                    ? const Icon(Icons.check_rounded, color: accent)
+                    : null,
+                onTap: () {
+                  setState(() => chaptersDescending = true);
+                  Navigator.pop(context);
+                }),
+            ListTile(
+                leading: const Icon(Icons.sort_rounded, color: accent),
+                title: const Text('عدد الفصول'),
+                trailing: !chaptersDescending
+                    ? const Icon(Icons.check_rounded, color: accent)
+                    : null,
+                onTap: () {
+                  setState(() => chaptersDescending = false);
+                  Navigator.pop(context);
+                })
+          ])));
   void open(Page p) => setState(() {
         page = p;
         selected = null;
@@ -270,6 +315,8 @@ class _ShellState extends State<Shell> {
                     const TextStyle(fontWeight: FontWeight.w700, fontSize: 20))
           ]),
           actions: [
+            IconButton(
+                icon: const Icon(Icons.sort_rounded), onPressed: showSortMenu),
             IconButton(
                 icon: const Icon(Icons.search_rounded),
                 onPressed: () => showSearch(
@@ -295,17 +342,17 @@ class _ShellState extends State<Shell> {
       ? OfflineState(onRetry: () => setState(() => online = true))
       : switch (page) {
           Page.latest => Collection(
-              items: manga,
+              items: ordered(manga),
               onTap: (x) => setState(() => selected = x),
               compact: compact,
               header: 'آخر التحديثات'),
           Page.manga => Collection(
-              items: manga,
+              items: ordered(manga),
               onTap: (x) => setState(() => selected = x),
               compact: compact,
               header: 'استكشف المانجا'),
           Page.favorites => Collection(
-              items: manga.where((x) => x.favorite).toList(),
+              items: ordered(manga.where((x) => x.favorite).toList()),
               onTap: (x) => setState(() => selected = x),
               compact: compact,
               header: 'المفضلة'),
@@ -350,7 +397,11 @@ class _ShellState extends State<Shell> {
         selected: active,
         selectedTileColor: accent.withOpacity(.12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        leading: Icon(icon, color: active ? accent : muted),
+        leading: p == Page.notifications && tasks.isNotEmpty
+            ? Badge(
+                label: Text('${tasks.length}'),
+                child: Icon(icon, color: active ? accent : muted))
+            : Icon(icon, color: active ? accent : muted),
         title: Text(text,
             style: TextStyle(
                 color: active ? Colors.white : muted,
