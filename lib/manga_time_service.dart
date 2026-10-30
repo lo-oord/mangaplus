@@ -60,12 +60,16 @@ class MangaTimeDetails {
   final MangaTimeSeries series;
   final String? author;
   final String? artist;
+  final String sourceName;
+  final String sourceLogo;
   final List<MangaTimeChapter> chapters;
 
   const MangaTimeDetails({
     required this.series,
     required this.author,
     required this.artist,
+    required this.sourceName,
+    required this.sourceLogo,
     required this.chapters,
   });
 }
@@ -141,6 +145,8 @@ class MangaTimeService {
       series: series,
       author: _nullableString(detailsJson['author']),
       artist: _nullableString(detailsJson['artist']),
+      sourceName: _teamName(detailsJson),
+      sourceLogo: _teamLogo(detailsJson),
       chapters: chapters,
     );
     _detailsCache[slug] = _CacheEntry(result);
@@ -272,6 +278,17 @@ class MangaTimeService {
 
   String _imageUrl(String value) => value.startsWith('http') ? value : '$baseUrl$value';
 
+  String _teamName(Map<String, dynamic> json) {
+    final team = json['team'];
+    return team is Map ? (team['name'] ?? '').toString() : '';
+  }
+
+  String _teamLogo(Map<String, dynamic> json) {
+    final team = json['team'];
+    final logo = team is Map ? (team['logo'] ?? '').toString() : '';
+    return logo.isEmpty ? '' : _imageUrl(logo);
+  }
+
   Future<Directory> _cacheDirectory() async {
     final root = await getApplicationSupportDirectory();
     final directory = Directory('${root.path}/manga_time_cache');
@@ -313,7 +330,14 @@ class MangaTimeService {
       if (saved == null || DateTime.now().difference(saved) > _detailsLife) return null;
       final series = _seriesFromJson(Map<String, dynamic>.from(json['series']));
       final chapters = (json['chapters'] as List).map((item) => _chapterFromJson(Map<String, dynamic>.from(item))).toList();
-      return MangaTimeDetails(series: series, author: json['author']?.toString(), artist: json['artist']?.toString(), chapters: chapters);
+      return MangaTimeDetails(
+        series: series,
+        author: json['author']?.toString(),
+        artist: json['artist']?.toString(),
+        sourceName: json['sourceName']?.toString() ?? '',
+        sourceLogo: json['sourceLogo']?.toString() ?? '',
+        chapters: chapters,
+      );
     } catch (_) {
       return null;
     }
@@ -327,6 +351,8 @@ class MangaTimeService {
         'series': _seriesToJson(details.series),
         'author': details.author,
         'artist': details.artist,
+        'sourceName': details.sourceName,
+        'sourceLogo': details.sourceLogo,
         'chapters': details.chapters.map(_chapterToJson).toList(),
       }));
     } catch (_) {}

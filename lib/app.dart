@@ -15,9 +15,9 @@ const inkText = Color(0xFFF4F7FB);
 const danger = Color(0xFFFF7474);
 final ValueNotifier<bool> appDarkMode = ValueNotifier<bool>(true);
 
-Image mangaImage(String source, {BoxFit fit = BoxFit.cover}) {
-  final provider = source.startsWith('http') ? NetworkImage(source) : AssetImage(source);
-  return Image(image: provider, fit: fit);
+Image mangaImage(String source, {BoxFit fit = BoxFit.cover, double? width, double? height}) {
+  final ImageProvider<Object> provider = source.startsWith('http') ? NetworkImage(source) : AssetImage(source);
+  return Image(image: provider, fit: fit, width: width, height: height);
 }
 
 String ratingLabel(double rating) => rating > 0 ? rating.toStringAsFixed(1) : '—';
@@ -38,6 +38,8 @@ class MangaItem {
   double rating;
   String latestChapterNumber;
   DateTime? latestDate;
+  String sourceName = '';
+  String sourceLogo = '';
   bool favorite;
   List<MangaTimeChapter> remoteChapters = [];
 
@@ -1466,6 +1468,8 @@ class _DetailsState extends State<Details> {
       final data = await widget.source.fetchDetails(widget.item.slug);
       widget.item.updateFrom(data.series);
       widget.item.author = data.author ?? '';
+      widget.item.sourceName = data.sourceName;
+      widget.item.sourceLogo = data.sourceLogo;
       widget.item.remoteChapters = data.chapters;
       widget.item.chapters = data.chapters.length;
     } catch (_) {
@@ -1510,6 +1514,10 @@ class _DetailsState extends State<Details> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _primaryActions(),
+                  if (widget.item.sourceName.isNotEmpty && widget.item.sourceLogo.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    _sourceBadge(),
+                  ],
                   const SizedBox(height: 22),
                   _resumeCard(),
                   const SizedBox(height: 28),
@@ -1693,6 +1701,31 @@ class _DetailsState extends State<Details> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _sourceBadge() {
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Container(
+        padding: const EdgeInsetsDirectional.fromSTEB(7, 7, 12, 7),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(.07)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: SizedBox(width: 30, height: 30, child: mangaImage(widget.item.sourceLogo)),
+            ),
+            const SizedBox(width: 8),
+            Text(widget.item.sourceName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+          ],
+        ),
       ),
     );
   }
@@ -2045,7 +2078,7 @@ class DownloadTaskCard extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(11),
-                child: Image(image: task.item.asset.startsWith('http') ? NetworkImage(task.item.asset) : AssetImage(task.item.asset), width: 47, height: 62, fit: BoxFit.cover),
+                child: mangaImage(task.item.asset, width: 47, height: 62),
               ),
               const SizedBox(width: 12),
               Expanded(
